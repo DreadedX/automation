@@ -15,6 +15,7 @@ import (
 )
 
 type Location struct {
+	Type      string   `json:"_type"`
 	Longitude float32  `json:"lon"`
 	Latitude  float32  `json:"lat"`
 	Altitude  int      `json:"alt"`
@@ -128,6 +129,12 @@ func main() {
 		var location Location
 		json.Unmarshal(msg.Payload(), &location)
 
+		// Make sure that the message we get is a location update
+		// @TODO Find a more elegant way of doing this
+		if location.Type != "location" {
+			return
+		}
+
 		fmt.Println(location)
 		temp := false
 		for _, region := range location.InRegions {
@@ -159,7 +166,7 @@ func main() {
 	var brightness uint8 = 0
 
 	// Event loop
-	events:
+events:
 	for {
 		select {
 		case temp := <-home:
