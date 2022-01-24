@@ -1,0 +1,47 @@
+kind: pipeline
+type: docker
+name: default
+
+steps:
+    - name: build
+      image: docker
+      volumes:
+          - name: socket
+            path: /var/run/docker.sock
+      commands:
+          - docker build -t inventory .
+
+    - name: deploy
+      image: docker
+      volumes:
+          - name: socket
+            path: /var/run/docker.sock
+      environment:
+          MQTT_HOST:
+              from_secret: MQTT_HOST
+          MQTT_PORT:
+              from_secret: MQTT_PORT
+          MQTT_USER:
+              from_secret: MQTT_USER
+          MQTT_PASS:
+              from_secret: MQTT_PASS
+          HUE_BRIDGE:
+              from_secret: HUE_BRIDGE
+      commands:
+          - docker stop automation || true
+
+          - docker rm automation || true
+
+          - docker run -e MQTT_HOST=$MQTT_HOST -e MQTT_PORT=$MQTT_PORT -e MQTT_USER=$MQTT_USER -e MQTT_PASS=$MQTT_PASS -e HUE_BRIDGE=$HUE_BRIDGE --network mqtt --name automation -d automation
+
+      when:
+        branch:
+          - master
+        event:
+          exclude:
+            - pull_request
+
+volumes:
+    - name: socket
+      host:
+          path: /var/run/docker.sock
