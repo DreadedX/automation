@@ -1,3 +1,4 @@
-storage
+storage/
 automation
 .env
+tmp/
