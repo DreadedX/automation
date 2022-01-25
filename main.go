@@ -14,22 +14,44 @@ import (
 	"github.com/kelvins/sunrisesunset"
 )
 
-type Location struct {
-	Type      string   `json:"_type"`
+// @TODO Make this environment variables
+// SETTINGS
+// Group id of the lights in the living room
+const groupId = 1
+// The color temperature to use for the lights
+// @TODO Not sure how this is calulcated
+const Temperature uint16 = 366
+
+// All the different message types
+type Type string
+const (
+	Beacon        Type = "beacon"
+	Card               = "card"
+	Cmd                = "cmd"
+	Configuration      = "configuration"
+	Encrypted          = "encrypted"
+	Location           = "location"
+	Lwt                = "lwt"
+	Steps              = "steps"
+	Transition         = "transition"
+	Waypoint           = "waypoint"
+	Waypoints          = "waypoints"
+)
+
+// Struct for parsing message type
+type Identifier struct {
+	Type Type `json:"_type"`
+}
+
+// Struct with all the data from location messages
+type LocationData struct {
 	Longitude float32  `json:"lon"`
 	Latitude  float32  `json:"lat"`
 	Altitude  int      `json:"alt"`
 	InRegions []string `json:"inregions"`
 }
 
-var defaultHandler MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
-	fmt.Printf("TOPIC: %s\n", msg.Topic())
-	fmt.Printf("MSG: %s\n", msg.Payload())
-}
-
-const groupId = 1
-const brightness = 100
-
+// Get the time of the next sunrise and sunset
 func getNextSunriseSunset() (time.Time, time.Time) {
 	p := sunrisesunset.Parameters{
 		Latitude:  51.9808334,
@@ -61,6 +83,7 @@ func getNextSunriseSunset() (time.Time, time.Time) {
 	return sunrise, sunset
 }
 
+// Check if it is currently daytime
 func isDay() bool {
 	p := sunrisesunset.Parameters{
 		Latitude:  51.9808334,
@@ -76,10 +99,44 @@ func isDay() bool {
 	return time.Now().After(sunrise) && time.Now().Before(sunset)
 }
 
+// Turn off all the lights attached to the bridge
 func allLightsOff(bridge *huego.Bridge) {
 	lights, _ := bridge.GetLights()
 	for _, l := range lights {
 		l.Off()
+	}
+}
+
+// This is the default message handler, it just prints out the topic and message
+var defaultHandler MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
+	fmt.Printf("TOPIC: %s\n", msg.Topic())
+	fmt.Printf("MSG: %s\n", msg.Payload())
+}
+
+// Handler got owntrack/+/+
+func locationHandler(home chan bool) func(MQTT.Client, MQTT.Message) {
+	return func(client MQTT.Client, msg MQTT.Message) {
+		// Check the type of the MQTT message
+		var identifier Identifier
+		json.Unmarshal(msg.Payload(), &identifier)
+		if identifier.Type != Location {
+			return
+		}
+
+		// Marshall all the location data
+		var location LocationData
+		json.Unmarshal(msg.Payload(), &location)
+
+		fmt.Println(location)
+		temp := false
+		for _, region := range location.InRegions {
+			if region == "home" {
+				temp = true
+			}
+		}
+		fmt.Println(temp)
+
+		home <- temp
 	}
 }
 
@@ -125,29 +182,7 @@ func main() {
 	}
 
 	home := make(chan bool, 1)
-	var locationHandler MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
-		var location Location
-		json.Unmarshal(msg.Payload(), &location)
-
-		// Make sure that the message we get is a location update
-		// @TODO Find a more elegant way of doing this
-		if location.Type != "location" {
-			return
-		}
-
-		fmt.Println(location)
-		temp := false
-		for _, region := range location.InRegions {
-			if region == "home" {
-				temp = true
-			}
-		}
-		fmt.Println(temp)
-
-		home <- temp
-	}
-
-	if token := c.Subscribe("owntracks/mqtt/apollo", 0, locationHandler); token.Wait() && token.Error() != nil {
+	if token := c.Subscribe("owntracks/mqtt/apollo", 0, locationHandler(home)); token.Wait() && token.Error() != nil {
 		fmt.Println(token.Error())
 		os.Exit(1)
 	}
@@ -181,6 +216,7 @@ events:
 				if !isDay() {
 					fmt.Println("\tTurning on lights in the living room")
 					livingRoom.Bri(0xff)
+					livingRoom.Ct(Temperature)
 				}
 			} else {
 				// Stop the ticker in case it is running
@@ -205,6 +241,7 @@ events:
 				fmt.Println("\tGradually turning on lights in the living room")
 				// Start the ticker to gradually turn on the living room lights
 				ticker.Reset(1200 * time.Millisecond)
+				livingRoom.Ct(Temperature)
 			}
 
 			// Set new timer
