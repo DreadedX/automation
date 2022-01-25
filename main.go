@@ -161,8 +161,6 @@ func main() {
 	}
 	login, ok := os.LookupEnv("HUE_BRIDGE")
 
-	fmt.Println(host, port, user, pass, login)
-
 	halt := make(chan os.Signal, 1)
 	signal.Notify(halt, os.Interrupt, syscall.SIGTERM)
 
