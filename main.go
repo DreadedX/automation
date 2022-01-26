@@ -198,7 +198,7 @@ func main() {
 	ticker := time.NewTicker(time.Second)
 	ticker.Stop()
 
-	var brightness uint8 = 0
+	var brightness uint8 = 1
 
 	// Event loop
 events:
@@ -241,6 +241,7 @@ events:
 				fmt.Println("\tGradually turning on lights in the living room")
 				// Start the ticker to gradually turn on the living room lights
 				ticker.Reset(1200 * time.Millisecond)
+				livingRoom.Bri(brightness)
 				livingRoom.Ct(Temperature)
 			}
 
@@ -256,7 +257,7 @@ events:
 			if brightness == 0xff {
 				fmt.Println("Lights are now on, stopping ticker")
 				ticker.Stop()
-				brightness = 0
+				brightness = 1
 			}
 
 		case <-halt:
