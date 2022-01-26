@@ -80,6 +80,8 @@ func getNextSunriseSunset() (time.Time, time.Time) {
 		sunset = sunset2
 	}
 
+	sunset = sunset.Add(-time.Minute*30)
+
 	return sunrise, sunset
 }
 
