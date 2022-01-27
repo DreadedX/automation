@@ -63,6 +63,7 @@ func getNextSunriseSunset() (time.Time, time.Time) {
 	if err != nil {
 		panic(err)
 	}
+	sunset = sunset.Add(-time.Minute*30)
 
 	p2 := sunrisesunset.Parameters{
 		Latitude:  51.9808334,
@@ -70,6 +71,10 @@ func getNextSunriseSunset() (time.Time, time.Time) {
 		Date:      time.Now().Add(time.Hour * 24),
 	}
 	sunrise2, sunset2, err := p2.GetSunriseSunset()
+	if err != nil {
+		panic(err)
+	}
+	sunset2 = sunset2.Add(-time.Minute*30)
 
 	now := time.Now()
 	if now.After(sunrise) {
@@ -79,8 +84,6 @@ func getNextSunriseSunset() (time.Time, time.Time) {
 	if now.After(sunset) {
 		sunset = sunset2
 	}
-
-	sunset = sunset.Add(-time.Minute*30)
 
 	return sunrise, sunset
 }
@@ -97,6 +100,7 @@ func isDay() bool {
 	if err != nil {
 		panic(err)
 	}
+	sunset = sunset.Add(-time.Minute*30)
 
 	return time.Now().After(sunrise) && time.Now().Before(sunset)
 }
