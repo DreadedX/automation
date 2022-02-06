@@ -245,8 +245,10 @@ events:
 				fmt.Println("\tGradually turning on lights in the living room")
 				// Start the ticker to gradually turn on the living room lights
 				ticker.Reset(1200 * time.Millisecond)
-				livingRoom.Bri(brightness)
-				livingRoom.Ct(Temperature)
+				if (livingRoom.State.Bri < brightness) {
+					livingRoom.Bri(brightness)
+					livingRoom.Ct(Temperature)
+				}
 			}
 
 			// Set new timer
