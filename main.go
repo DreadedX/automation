@@ -205,7 +205,7 @@ func main() {
 
 	// Create the ticker, but stop it
 	ticker := time.NewTicker(time.Second)
-	// ticker.Stop()
+	ticker.Stop()
 
 	var brightness uint8 = 1
 
