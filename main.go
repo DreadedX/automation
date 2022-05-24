@@ -165,13 +165,18 @@ func main() {
 	if !ok {
 		pass = "test"
 	}
-	login, ok := os.LookupEnv("HUE_BRIDGE")
+	login, _ := os.LookupEnv("HUE_BRIDGE")
 
 	halt := make(chan os.Signal, 1)
 	signal.Notify(halt, os.Interrupt, syscall.SIGTERM)
 
-	bridge, _ := huego.Discover()
-	bridge = bridge.Login(login)
+	// bridge, _ := huego.Discover()
+	// bridge = bridge.Login(login)
+	// @TODO Let's hope the IP does not change, should probably set a static IP
+	bridge := huego.New("10.0.0.146", login)
+	if bridge == nil {
+		panic("Bridge is nil")
+	}
 	livingRoom, _ := bridge.GetGroup(groupId)
 
 	opts := MQTT.NewClientOptions().AddBroker(fmt.Sprintf("%s:%s", host, port))
@@ -200,7 +205,7 @@ func main() {
 
 	// Create the ticker, but stop it
 	ticker := time.NewTicker(time.Second)
-	ticker.Stop()
+	// ticker.Stop()
 
 	var brightness uint8 = 1
 
@@ -245,7 +250,8 @@ events:
 				fmt.Println("\tGradually turning on lights in the living room")
 				// Start the ticker to gradually turn on the living room lights
 				ticker.Reset(1200 * time.Millisecond)
-				if (livingRoom.State.Bri < brightness) {
+				if !livingRoom.IsOn() || livingRoom.State.Bri < brightness {
+					fmt.Println("Setting brightness:", brightness)
 					livingRoom.Bri(brightness)
 					livingRoom.Ct(Temperature)
 				}
@@ -256,10 +262,13 @@ events:
 			sunsetTimer.Reset(sunset.Sub(time.Now()))
 
 		case <-ticker.C:
-			fmt.Println("Setting brightness:", brightness)
-			livingRoom.Bri(brightness)
-
 			brightness++
+			if !livingRoom.IsOn() || livingRoom.State.Bri < brightness {
+				fmt.Println("Setting brightness:", brightness)
+				livingRoom.Bri(brightness)
+				livingRoom.Ct(Temperature)
+			}
+
 			if brightness == 0xff {
 				fmt.Println("Lights are now on, stopping ticker")
 				ticker.Stop()
