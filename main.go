@@ -250,7 +250,7 @@ events:
 				fmt.Println("\tGradually turning on lights in the living room")
 				// Start the ticker to gradually turn on the living room lights
 				ticker.Reset(1200 * time.Millisecond)
-				if !livingRoom.IsOn() || livingRoom.State.Bri < brightness {
+				if (!livingRoom.IsOn() || livingRoom.State.Bri < brightness) {
 					fmt.Println("Setting brightness:", brightness)
 					livingRoom.Bri(brightness)
 					livingRoom.Ct(Temperature)
@@ -263,7 +263,7 @@ events:
 
 		case <-ticker.C:
 			brightness++
-			if !livingRoom.IsOn() || livingRoom.State.Bri < brightness {
+			if (!livingRoom.IsOn() || livingRoom.State.Bri < brightness) {
 				fmt.Println("Setting brightness:", brightness)
 				livingRoom.Bri(brightness)
 				livingRoom.Ct(Temperature)
