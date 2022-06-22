@@ -177,7 +177,6 @@ func main() {
 	if bridge == nil {
 		panic("Bridge is nil")
 	}
-	livingRoom, _ := bridge.GetGroup(groupId)
 
 	opts := MQTT.NewClientOptions().AddBroker(fmt.Sprintf("%s:%s", host, port))
 	opts.SetClientID("automation")
@@ -224,6 +223,7 @@ events:
 				fmt.Println("Coming home")
 				if !isDay() {
 					fmt.Println("\tTurning on lights in the living room")
+					livingRoom, _ := bridge.GetGroup(groupId)
 					livingRoom.Bri(0xff)
 					livingRoom.Ct(Temperature)
 				}
@@ -250,6 +250,9 @@ events:
 				fmt.Println("\tGradually turning on lights in the living room")
 				// Start the ticker to gradually turn on the living room lights
 				ticker.Reset(1200 * time.Millisecond)
+
+				livingRoom, _ := bridge.GetGroup(groupId)
+
 				fmt.Println("DEBUG STUFG")
 				fmt.Println(livingRoom.IsOn())
 				fmt.Println(livingRoom.State.On)
@@ -270,6 +273,7 @@ events:
 
 		case <-ticker.C:
 			brightness++
+			livingRoom, _ := bridge.GetGroup(groupId)
 			if (!livingRoom.IsOn() || livingRoom.State.Bri < brightness) {
 				fmt.Println("Setting brightness:", brightness)
 				livingRoom.Bri(brightness)
