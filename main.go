@@ -1,10 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -119,30 +120,23 @@ var defaultHandler MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Messa
 	fmt.Printf("MSG: %s\n", msg.Payload())
 }
 
-// Handler got owntrack/+/+
-func locationHandler(home chan bool) func(MQTT.Client, MQTT.Message) {
+type DeviceStatus struct {
+	Name string
+	Present bool
+}
+
+// Handler got automation/presence/+
+func presenceHandler(status chan DeviceStatus) func(MQTT.Client, MQTT.Message) {
 	return func(client MQTT.Client, msg MQTT.Message) {
-		// Check the type of the MQTT message
-		var identifier Identifier
-		json.Unmarshal(msg.Payload(), &identifier)
-		if identifier.Type != Location {
-			return
+		device := strings.Split(msg.Topic(), "/")[2]
+		value, err := strconv.Atoi(string(msg.Payload()))
+		if err != nil {
+			panic(err)
 		}
 
-		// Marshall all the location data
-		var location LocationData
-		json.Unmarshal(msg.Payload(), &location)
+		fmt.Println("presenceHandler", device, value)
 
-		fmt.Println(location)
-		temp := false
-		for _, region := range location.InRegions {
-			if region == "home" {
-				temp = true
-			}
-		}
-		fmt.Println(temp)
-
-		home <- temp
+		status <- DeviceStatus{Name: device, Present: value == 1}
 	}
 }
 
@@ -189,8 +183,8 @@ func main() {
 		panic(token.Error())
 	}
 
-	home := make(chan bool, 1)
-	if token := c.Subscribe("owntracks/mqtt/apollo", 0, locationHandler(home)); token.Wait() && token.Error() != nil {
+	status := make(chan DeviceStatus, 1)
+	if token := c.Subscribe("automation/presence/+", 0, presenceHandler(status)); token.Wait() && token.Error() != nil {
 		fmt.Println(token.Error())
 		os.Exit(1)
 	}
@@ -208,11 +202,28 @@ func main() {
 
 	var brightness uint8 = 1
 
+	fmt.Println("Starting event loop")
+
+	devices := make(map[string]bool)
+
 	// Event loop
 events:
 	for {
 		select {
-		case temp := <-home:
+		case state := <-status:
+			// Update the device state
+			devices[state.Name] = state.Present
+
+			// Check if there is any device home
+			temp := false
+			for key, value := range devices {
+				fmt.Println(key, value)
+				if value {
+					temp = true
+					break;
+				}
+			}
+
 			// Only do stuff if the state changes
 			if temp == isHome {
 				break
@@ -235,6 +246,8 @@ events:
 				allLightsOff(bridge)
 				break
 			}
+
+			fmt.Println("Done")
 
 		case <-sunriseTimer.C:
 			fmt.Println("Sun is rising, turning off all lights")
@@ -292,7 +305,7 @@ events:
 	}
 
 	// Cleanup
-	if token := c.Unsubscribe("owntracks/mqtt/apollo"); token.Wait() && token.Error() != nil {
+	if token := c.Unsubscribe("automation/presence/+"); token.Wait() && token.Error() != nil {
 		fmt.Println(token.Error())
 		os.Exit(1)
 	}
