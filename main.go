@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -9,48 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/amimof/huego"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"github.com/joho/godotenv"
 	"github.com/kelvins/sunrisesunset"
 )
-
-// @TODO Make this environment variables
-// SETTINGS
-// Group id of the lights in the living room
-const groupId = 1
-// The color temperature to use for the lights
-// @TODO Not sure how this is calulcated
-const Temperature uint16 = 366
-
-// All the different message types
-type Type string
-const (
-	Beacon        Type = "beacon"
-	Card               = "card"
-	Cmd                = "cmd"
-	Configuration      = "configuration"
-	Encrypted          = "encrypted"
-	Location           = "location"
-	Lwt                = "lwt"
-	Steps              = "steps"
-	Transition         = "transition"
-	Waypoint           = "waypoint"
-	Waypoints          = "waypoints"
-)
-
-// Struct for parsing message type
-type Identifier struct {
-	Type Type `json:"_type"`
-}
-
-// Struct with all the data from location messages
-type LocationData struct {
-	Longitude float32  `json:"lon"`
-	Latitude  float32  `json:"lat"`
-	Altitude  int      `json:"alt"`
-	InRegions []string `json:"inregions"`
-}
 
 // Get the time of the next sunrise and sunset
 func getNextSunriseSunset() (time.Time, time.Time) {
@@ -106,14 +71,6 @@ func isDay() bool {
 	return time.Now().After(sunrise) && time.Now().Before(sunset)
 }
 
-// Turn off all the lights attached to the bridge
-func allLightsOff(bridge *huego.Bridge) {
-	lights, _ := bridge.GetLights()
-	for _, l := range lights {
-		l.Off()
-	}
-}
-
 // This is the default message handler, it just prints out the topic and message
 var defaultHandler MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
 	fmt.Printf("TOPIC: %s\n", msg.Topic())
@@ -140,6 +97,30 @@ func presenceHandler(status chan DeviceStatus) func(MQTT.Client, MQTT.Message) {
 	}
 }
 
+type Hue struct {
+	ip string
+	login string
+}
+
+func (hue *Hue) putRequest(resource string, data string) {
+	url := fmt.Sprintf("https://%s/clip/v2/resource/%s", hue.ip, resource)
+
+	client := &http.Client{}
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer([]byte(data)))
+	if err != nil {
+		panic(err)
+	}
+
+	req.Header.Set("hue-application-key", hue.login)
+
+	_, err = client.Do(req)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func main() {
 	_ = godotenv.Load()
 
@@ -159,21 +140,20 @@ func main() {
 	if !ok {
 		pass = "test"
 	}
+	clientID, ok := os.LookupEnv("MQTT_CLIENT_ID")
+	if !ok {
+		clientID = "automation"
+	}
 	login, _ := os.LookupEnv("HUE_BRIDGE")
 
 	halt := make(chan os.Signal, 1)
 	signal.Notify(halt, os.Interrupt, syscall.SIGTERM)
 
-	// bridge, _ := huego.Discover()
-	// bridge = bridge.Login(login)
-	// @TODO Let's hope the IP does not change, should probably set a static IP
-	bridge := huego.New("10.0.0.146", login)
-	if bridge == nil {
-		panic("Bridge is nil")
-	}
+	// @TODO Discover the bridge here
+	hue := Hue{ip: "10.0.0.146", login: login}
 
 	opts := MQTT.NewClientOptions().AddBroker(fmt.Sprintf("%s:%s", host, port))
-	opts.SetClientID("automation")
+	opts.SetClientID(clientID)
 	opts.SetDefaultPublishHandler(defaultHandler)
 	opts.SetUsername(user)
 	opts.SetPassword(pass)
@@ -189,22 +169,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Setup initial states
-	isHome := false
-
 	sunrise, sunset := getNextSunriseSunset()
 	sunriseTimer := time.NewTimer(sunrise.Sub(time.Now()))
 	sunsetTimer := time.NewTimer(sunset.Sub(time.Now()))
 
-	// Create the ticker, but stop it
-	ticker := time.NewTicker(time.Second)
-	ticker.Stop()
-
-	var brightness uint8 = 1
+	devices := make(map[string]bool)
+	isHome := false
 
 	fmt.Println("Starting event loop")
-
-	devices := make(map[string]bool)
 
 	// Event loop
 events:
@@ -234,16 +206,11 @@ events:
 				fmt.Println("Coming home")
 				if !isDay() {
 					fmt.Println("\tTurning on lights in the living room")
-					livingRoom, _ := bridge.GetGroup(groupId)
-					livingRoom.Bri(0xff)
-					livingRoom.Ct(Temperature)
+					hue.putRequest("scene/1847ec79-3459-4d79-ae73-803a0c6e7ac2", `{"recall": { "action": "active", "status": "active"}}`)
 				}
 			} else {
-				// Stop the ticker in case it is running
-				ticker.Stop()
-
 				fmt.Println("Leaving home")
-				allLightsOff(bridge)
+				hue.putRequest("grouped_light/91c400ed-7eda-4b5c-ac3f-bfff226188d7", `{"on": { "on": false}}`)
 				break
 			}
 
@@ -251,7 +218,7 @@ events:
 
 		case <-sunriseTimer.C:
 			fmt.Println("Sun is rising, turning off all lights")
-			allLightsOff(bridge)
+			hue.putRequest("grouped_light/91c400ed-7eda-4b5c-ac3f-bfff226188d7", `{"on": { "on": false}}`)
 
 			// Set new timer
 			sunrise, _ := getNextSunriseSunset()
@@ -261,43 +228,12 @@ events:
 			fmt.Println("Sun is setting")
 			if isHome {
 				fmt.Println("\tGradually turning on lights in the living room")
-				// Start the ticker to gradually turn on the living room lights
-				ticker.Reset(1200 * time.Millisecond)
-
-				livingRoom, _ := bridge.GetGroup(groupId)
-
-				fmt.Println("DEBUG STUFG")
-				fmt.Println(livingRoom.IsOn())
-				fmt.Println(livingRoom.State.On)
-				fmt.Println(livingRoom.State.Bri)
-				fmt.Println(livingRoom.State.Ct)
-				fmt.Println(brightness)
-
-				if (!livingRoom.IsOn() || livingRoom.State.Bri < brightness) {
-					fmt.Println("Setting brightness:", brightness)
-					livingRoom.Bri(brightness)
-					livingRoom.Ct(Temperature)
-				}
+				hue.putRequest("scene/1847ec79-3459-4d79-ae73-803a0c6e7ac2", `{"recall": { "action": "active", "status": "active", "duration": 300000}}`)
 			}
 
 			// Set new timer
 			_, sunset := getNextSunriseSunset()
 			sunsetTimer.Reset(sunset.Sub(time.Now()))
-
-		case <-ticker.C:
-			brightness++
-			livingRoom, _ := bridge.GetGroup(groupId)
-			if (!livingRoom.IsOn() || livingRoom.State.Bri < brightness) {
-				fmt.Println("Setting brightness:", brightness)
-				livingRoom.Bri(brightness)
-				livingRoom.Ct(Temperature)
-			}
-
-			if brightness == 0xff {
-				fmt.Println("Lights are now on, stopping ticker")
-				ticker.Stop()
-				brightness = 1
-			}
 
 		case <-halt:
 			break events
