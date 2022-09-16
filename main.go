@@ -194,7 +194,7 @@ events:
 	for {
 		select {
 		case present := <-presence:
-			fmt.Printf("Present: %t", present)
+			fmt.Printf("Present: %t\n", present)
 			hue.updateFlag(41, present)
 			ntfy.notifyPresence(present)
 
