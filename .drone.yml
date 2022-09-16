@@ -32,7 +32,7 @@ steps:
 
           - docker rm automation || true
 
-          - docker run -e MQTT_HOST=$MQTT_HOST -e MQTT_PORT=$MQTT_PORT -e MQTT_USER=$MQTT_USER -e MQTT_PASS=$MQTT_PASS -e MQTT_CLIENT_ID=$MQTT_CLIENT_ID -e HUE_BRIDGE=$HUE_BRIDGE -e NTFY_TOPIC=%NTFY_TOPIC --network mqtt --name automation -d automation
+          - docker run -e MQTT_HOST=$MQTT_HOST -e MQTT_PORT=$MQTT_PORT -e MQTT_USER=$MQTT_USER -e MQTT_PASS=$MQTT_PASS -e MQTT_CLIENT_ID=$MQTT_CLIENT_ID -e HUE_BRIDGE=$HUE_BRIDGE -e NTFY_TOPIC=$NTFY_TOPIC --network mqtt --name automation -d automation
 
       when:
         branch:
