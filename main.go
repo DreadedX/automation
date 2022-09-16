@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -9,9 +11,11 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"github.com/joho/godotenv"
+	"github.com/r3labs/sse/v2"
 )
 
 // This is the default message handler, it just prints out the topic and message
@@ -21,7 +25,7 @@ var defaultHandler MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Messa
 }
 
 type DeviceStatus struct {
-	Name string
+	Name    string
 	Present bool
 }
 
@@ -41,8 +45,21 @@ func presenceHandler(status chan DeviceStatus) func(MQTT.Client, MQTT.Message) {
 }
 
 type Hue struct {
-	ip string
+	ip    string
 	login string
+}
+
+func (hue *Hue) listenForEvents(events chan *sse.Event) {
+	client := sse.NewClient(fmt.Sprintf("https://%s/eventstream/clip/v2", hue.ip))
+	client.Headers["hue-application-key"] = hue.login
+	client.Connection.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	err := client.SubscribeChanRaw(events)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (hue *Hue) updateFlag(id int, value bool) {
@@ -65,6 +82,38 @@ func (hue *Hue) updateFlag(id int, value bool) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+type lastEvent struct {
+	LastEvent string `json:"last_event"`
+}
+
+type owner struct {
+	Rid   string `json:"rid"`
+	Rtype string `json:"rtype"`
+}
+
+type Button struct {
+	Button lastEvent `json:"button"`
+	Id     string    `json:"id"`
+	IdV1   string    `json:"id_v1"`
+	Owner  owner     `json:"owner"`
+	Type   string    `json:"type"`
+}
+
+type on struct {
+	On bool `json:"on"`
+}
+
+type typeInfo struct {
+	Type string `json:"type"`
+}
+
+type Event struct {
+	CreationTime time.Time       `json:"creationtime"`
+	Data         []json.RawMessage `json:"data"`
+	ID           string          `json:"id"`
+	Type         string          `json:"type"`
 }
 
 func main() {
@@ -97,6 +146,8 @@ func main() {
 
 	// @TODO Discover the bridge here
 	hue := Hue{ip: "10.0.0.146", login: login}
+	events := make(chan *sse.Event)
+	hue.listenForEvents(events)
 
 	opts := MQTT.NewClientOptions().AddBroker(fmt.Sprintf("%s:%s", host, port))
 	opts.SetClientID(clientID)
@@ -134,7 +185,7 @@ events:
 				fmt.Println(key, value)
 				if value {
 					temp = true
-					break;
+					break
 				}
 			}
 
@@ -153,6 +204,27 @@ events:
 			}
 
 			fmt.Println("Done")
+
+		case message := <-events:
+			events := []Event{}
+			json.Unmarshal(message.Data, &events)
+
+			for _, event := range events {
+				if event.Type == "update" {
+					for _, data := range event.Data {
+						var typeInfo typeInfo
+						json.Unmarshal(data, &typeInfo)
+
+						switch typeInfo.Type {
+						case "button":
+							fmt.Println("Button")
+							var button Button
+							json.Unmarshal(data, &button)
+							fmt.Println(button)
+						}
+					}
+				}
+			}
 
 		case <-halt:
 			break events
