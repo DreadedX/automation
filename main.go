@@ -83,6 +83,32 @@ func (hue *Hue) updateFlag(id int, value bool) {
 	}
 }
 
+type ntfy struct{
+	topic string
+}
+
+func (ntfy *ntfy) notifyPresence(home bool) {
+	var description string
+	var actions string
+	if home {
+		description = "Home"
+		actions = "broadcast, Set as away, extras.cmd=presence, extras.state=0, clear=true"
+	} else {
+		description = "Away"
+		actions = "broadcast, Set as home, extras.cmd=presence, extras.state=1, clear=true"
+	}
+
+	req, _ := http.NewRequest("POST", fmt.Sprintf("https://ntfy.sh/%s", ntfy.topic),
+	strings.NewReader(description))
+
+	req.Header.Set("Title", "Presence")
+	req.Header.Set("Tags", "house")
+	req.Header.Set("Actions", actions)
+	req.Header.Set("Priority", "1")
+
+	http.DefaultClient.Do(req)
+}
+
 func connectToHue() Hue {
 	login, _ := os.LookupEnv("HUE_BRIDGE")
 
@@ -130,6 +156,15 @@ func connectMQTT() MQTT.Client {
 	return client
 }
 
+func connectNtfy() ntfy {
+	topic, _ := os.LookupEnv("NTFY_TOPIC")
+	ntfy := ntfy{topic}
+
+	// @TODO Make sure the topic is valid?
+
+	return ntfy
+}
+
 func main() {
 	_ = godotenv.Load()
 
@@ -138,32 +173,27 @@ func main() {
 	signal.Notify(halt, os.Interrupt, syscall.SIGTERM)
 
 	// MQTT
-	presence := make(chan bool, 1)
 	client := connectMQTT()
+	presence := make(chan bool, 1)
 	if token := client.Subscribe("automation/presence/+", 0, presenceHandler(presence)); token.Wait() && token.Error() != nil {
 		fmt.Println(token.Error())
 		os.Exit(1)
 	}
-
 	// Hue
 	hue := connectToHue()
 
-	fmt.Println("Starting event loop")
+	// ntfy.sh
+	ntfy := connectNtfy()
 
 	// Event loop
+	fmt.Println("Starting event loop")
 events:
 	for {
 		select {
 		case present := <-presence:
-			if present {
-				fmt.Println("Coming home")
-				hue.updateFlag(41, true)
-			} else {
-				fmt.Println("Leaving home")
-				hue.updateFlag(41, false)
-			}
-
-			fmt.Println("Done")
+			fmt.Printf("Present: %t", present)
+			hue.updateFlag(41, present)
+			ntfy.notifyPresence(present)
 
 		case <-halt:
 			break events
