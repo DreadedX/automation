@@ -159,6 +159,8 @@ events:
 				fmt.Println("Coming home")
 				hue.updateFlag(41, true)
 			} else {
+				fmt.Println("Leaving home")
+				hue.updateFlag(41, false)
 			}
 
 			fmt.Println("Done")
