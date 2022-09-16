@@ -88,6 +88,7 @@ type ntfy struct{
 }
 
 func (ntfy *ntfy) notifyPresence(home bool) {
+	// @TODO Maybe add list the devices that are home currently?
 	var description string
 	var actions string
 	if home {
@@ -98,8 +99,10 @@ func (ntfy *ntfy) notifyPresence(home bool) {
 		actions = "broadcast, Set as home, extras.cmd=presence, extras.state=1, clear=true"
 	}
 
-	req, _ := http.NewRequest("POST", fmt.Sprintf("https://ntfy.sh/%s", ntfy.topic),
-	strings.NewReader(description))
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://ntfy.sh/%s", ntfy.topic), strings.NewReader(description))
+	if err != nil {
+		panic(err)
+	}
 
 	req.Header.Set("Title", "Presence")
 	req.Header.Set("Tags", "house")
