@@ -27,6 +27,8 @@ steps:
               from_secret: MQTT_PASS
           HUE_BRIDGE:
               from_secret: HUE_BRIDGE
+          NTFY_TOPIC:
+              from_secret: NTFY_TOPIC
       commands:
           - docker stop automation || true
 

@@ -99,8 +99,6 @@ func (ntfy *ntfy) notifyPresence(home bool) {
 		actions = "broadcast, Set as home, extras.cmd=presence, extras.state=1, clear=true"
 	}
 
-	fmt.Printf("https://ntfy.sh/%s\n", ntfy.topic)
-
 	req, err := http.NewRequest("POST", fmt.Sprintf("https://ntfy.sh/%s", ntfy.topic), strings.NewReader(description))
 	if err != nil {
 		panic(err)
@@ -163,7 +161,6 @@ func connectMQTT() MQTT.Client {
 
 func connectNtfy() ntfy {
 	topic, _ := os.LookupEnv("NTFY_TOPIC")
-	fmt.Println(topic)
 	ntfy := ntfy{topic}
 
 	// @TODO Make sure the topic is valid?
