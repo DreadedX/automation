@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/signal"
@@ -115,10 +117,41 @@ func (ntfy *ntfy) notifyPresence(home bool) {
 func connectToHue() Hue {
 	login, _ := os.LookupEnv("HUE_BRIDGE")
 
-	// @TODO Discover the bridge here
-	hue := Hue{ip: "10.0.0.146", login: login}
+	resp, err := http.Get("https://discovery.meethue.com/")
+	if err != nil {
+		panic(err)
+	}
 
-	// @TODO Make sure we actually are connected here
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	var bridges []struct {
+		ID string `json:"id"`
+		InternalIPAddress string `json:"internalipaddress"`
+		Port int `json:"port"`
+	}
+	err = json.Unmarshal(body, &bridges)
+	if err != nil {
+		panic(err)
+	}
+
+	if len(bridges) != 1 {
+		fmt.Println(bridges)
+		panic("Expected one bridge!")
+	}
+
+	hue := Hue{ip: bridges[0].InternalIPAddress, login: login}
+
+	resp, err = http.Get("https://discovery.meethue.com/")
+	if err != nil {
+		panic(err)
+	}
+
+	if resp.Status != "200 OK" {
+		panic("Check failed")
+	}
 
 	return hue
 }
