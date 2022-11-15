@@ -52,6 +52,11 @@ func main() {
 				fmt.Printf("Presence: %t\n", present)
 				h.SetFlag(41, present)
 				n.Presence(present)
+				if !present {
+					provider.TurnAllOff()
+				} else {
+					// In the future this is were we can do things like turning on the lights in the living room
+				}
 
 			case <-h.Events:
 				break

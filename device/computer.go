@@ -62,3 +62,7 @@ func (c *computer) Execute(execution google.Execution, updateState *google.Devic
 func (c *computer) GetID() string {
 	return c.macAddress
 }
+
+func (c *computer) TurnOff() {
+	// Scene does not implement this
+}

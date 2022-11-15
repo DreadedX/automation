@@ -25,12 +25,17 @@ type DeviceInfo struct {
 	SoftwareBuildID string `json:"software_build_id"`
 }
 
+type DeviceInterface interface {
+	google.DeviceInterface
+	TurnOff()
+}
+
 type Provider struct {
 	Service *google.Service
 	userID string
 
-	devices map[string]google.DeviceInterface
-	manualDevices map[string]google.DeviceInterface
+	devices map[string]DeviceInterface
+	manualDevices map[string]DeviceInterface
 }
 
 func NewProvider(m *mqtt.MQTT) *Provider {
@@ -41,7 +46,7 @@ func NewProvider(m *mqtt.MQTT) *Provider {
 		os.Exit(1)
 	}
 
-	provider := &Provider{userID: "Dreaded_X", devices: make(map[string]google.DeviceInterface), manualDevices: make(map[string]google.DeviceInterface)}
+	provider := &Provider{userID: "Dreaded_X", devices: make(map[string]DeviceInterface), manualDevices: make(map[string]DeviceInterface)}
 
 	homegraphService, err := homegraph.NewService(context.Background(), option.WithCredentialsJSON(credentials))
 	if err != nil {
@@ -64,8 +69,8 @@ func NewProvider(m *mqtt.MQTT) *Provider {
 		for _, device := range devices {
 			switch device.Description {
 			case "Kettle":
-				outlet := NewKettle(device, m, provider.Service)
-				provider.devices[device.IEEEAdress] = outlet
+				kettle := NewKettle(device, m, provider.Service)
+				provider.devices[device.IEEEAdress] = kettle
 				log.Printf("Added Kettle (%s) %s\n", device.IEEEAdress, device.FriendlyName)
 			}
 		}
@@ -77,7 +82,7 @@ func NewProvider(m *mqtt.MQTT) *Provider {
 	return provider
 }
 
-func (p *Provider) AddDevice(device google.DeviceInterface) {
+func (p *Provider) AddDevice(device DeviceInterface) {
 	p.devices[device.GetID()] = device
 	p.manualDevices[device.GetID()] = device
 }
@@ -137,4 +142,10 @@ func (p *Provider) Execute(_ context.Context, _ string, commands []google.Comman
 	}
 
 	return resp, nil
+}
+
+func (p *Provider) TurnAllOff() {
+	for _, device := range p.devices {
+		device.TurnOff()
+	}
 }

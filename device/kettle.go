@@ -168,3 +168,7 @@ func (k *kettle) Execute(execution google.Execution, updatedState *google.Device
 func (k *kettle) GetID() string {
 	return k.Info.IEEEAdress
 }
+
+func (k *kettle) TurnOff() {
+	k.m.Publish(fmt.Sprintf("zigbee2mqtt/%s/set", k.Info.FriendlyName), 1, false, fmt.Sprintf(`{ "state": "OFF" }`))
+}
