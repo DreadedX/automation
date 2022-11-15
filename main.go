@@ -1,10 +1,11 @@
 package main
 
 import (
+	"automation/device"
 	"automation/integration/hue"
+	"automation/integration/kasa"
 	"automation/integration/mqtt"
 	"automation/integration/ntfy"
-	"automation/device"
 	"automation/presence"
 	"fmt"
 	"log"
@@ -26,7 +27,8 @@ func main() {
 	h := hue.Connect()
 
 	// Kasa
-	// k := kasa.New("10.0.0.32")
+	mixer := kasa.New("10.0.0.49")
+	speakers := kasa.New("10.0.0.182")
 
 	// ntfy.sh
 	n := ntfy.Connect()
@@ -50,12 +52,23 @@ func main() {
 			select {
 			case present := <-p.Presence:
 				fmt.Printf("Presence: %t\n", present)
-				h.SetFlag(41, present)
+				// Notify users of presence update
 				n.Presence(present)
+
+				// Set presence on the hue bridge
+				h.SetFlag(41, present)
+
 				if !present {
+					// Turn off all the devices that we manage ourselves
 					provider.TurnAllOff()
+
+					// Turn off kasa devices
+					mixer.SetState(false)
+					speakers.SetState(false)
+
+					// @TODO Turn off nest thermostat
 				} else {
-					// In the future this is were we can do things like turning on the lights in the living room
+					// @TODO Turn on the nest thermostat again
 				}
 
 			case <-h.Events:
