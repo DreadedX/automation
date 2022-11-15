@@ -1,26 +1,22 @@
 package main
 
 import (
-	"automation/hue"
-	"automation/mqtt"
-	"automation/ntfy"
+	"automation/integration/hue"
+	"automation/integration/mqtt"
+	"automation/integration/ntfy"
+	"automation/device"
+	"automation/presence"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
 
+	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
 
-func SendCmd(cmd []byte) {
-}
-
 func main() {
 	_ = godotenv.Load()
-
-	// Signals
-	halt := make(chan os.Signal, 1)
-	signal.Notify(halt, os.Interrupt, syscall.SIGTERM)
 
 	// MQTT
 	m := mqtt.Connect()
@@ -35,21 +31,38 @@ func main() {
 	// ntfy.sh
 	n := ntfy.Connect()
 
+	// Presence
+	p := presence.New()
+	m.AddHandler("automation/presence/+", p.PresenceHandler)
+
+	// Smart home
+	service := smarthome.NewService(&m)
+
+	r := mux.NewRouter()
+	r.HandleFunc("/assistant", service.FullfillmentHandler)
+
 	// Event loop
-	fmt.Println("Starting event loop")
-events:
-	for {
-		select {
-		case present := <-m.Presence:
-			fmt.Printf("Presence: %t\n", present)
-			h.SetFlag(41, present)
-			n.Presence(present)
+	go func() {
+		fmt.Println("Starting event loop")
+		for {
+			select {
+			case present := <-p.Presence:
+				fmt.Printf("Presence: %t\n", present)
+				h.SetFlag(41, present)
+				n.Presence(present)
 
-		case <-h.Events:
-			break
-
-		case <-halt:
-			break events
+			case <-h.Events:
+				break
+			}
 		}
+	}()
+
+	addr := ":8090"
+	srv := http.Server{
+		Addr:    addr,
+		Handler: r,
 	}
+
+	log.Printf("Starting server on %s (PID: %d)\n", addr, os.Getpid())
+	srv.ListenAndServe()
 }

@@ -40,8 +40,9 @@ func (hue *Hue) SetFlag(id int, value bool) {
 
 func Connect() Hue {
 	login, _ := os.LookupEnv("HUE_BRIDGE")
+	ip, _ := os.LookupEnv("HUE_IP")
 
-	hue := Hue{ip: "10.0.0.146", login: login, Events: make(chan *sse.Event)}
+	hue := Hue{ip: ip, login: login, Events: make(chan *sse.Event)}
 
 	// Subscribe to eventstream
 	client := sse.NewClient(fmt.Sprintf("https://%s/eventstream/clip/v2", hue.ip))

@@ -3,14 +3,11 @@ package mqtt
 import (
 	"fmt"
 	"os"
-	"strconv"
-	"strings"
 
 	"github.com/eclipse/paho.mqtt.golang"
 )
 
 type MQTT struct {
-	Presence chan bool
 	client   mqtt.Client
 }
 
@@ -18,42 +15,6 @@ type MQTT struct {
 var defaultHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 	fmt.Printf("TOPIC: %s\n", msg.Topic())
 	fmt.Printf("MSG: %s\n", msg.Payload())
-}
-
-// Handler got automation/presence/+
-func presenceHandler(presence chan bool) func(mqtt.Client, mqtt.Message) {
-	devices := make(map[string]bool)
-	var current *bool
-
-	return func(client mqtt.Client, msg mqtt.Message) {
-		name := strings.Split(msg.Topic(), "/")[2]
-		if len(msg.Payload()) == 0 {
-			// @TODO What happens if we delete a device that does not exist
-			delete(devices, name)
-		} else {
-			value, err := strconv.Atoi(string(msg.Payload()))
-			if err != nil {
-				panic(err)
-			}
-
-			devices[name] = value == 1
-		}
-
-		present := false
-		fmt.Println(devices)
-		for _, value := range devices {
-			if value {
-				present = true
-				break
-			}
-		}
-
-		if current == nil || *current != present {
-			current = &present
-			presence <- present
-		}
-
-	}
 }
 
 func Connect() MQTT {
@@ -89,12 +50,7 @@ func Connect() MQTT {
 		panic(token.Error())
 	}
 
-	m := MQTT{client: client, Presence: make(chan bool)}
-
-	if token := client.Subscribe("automation/presence/+", 0, presenceHandler(m.Presence)); token.Wait() && token.Error() != nil {
-		fmt.Println(token.Error())
-		os.Exit(1)
-	}
+	m := MQTT{client: client}
 
 	return m
 }
@@ -106,4 +62,19 @@ func (m *MQTT) Disconnect() {
 	}
 
 	m.client.Disconnect(250)
+}
+
+func (m *MQTT) AddHandler(topic string, handler func(client mqtt.Client, msg mqtt.Message)) {
+	if token := m.client.Subscribe(topic, 0, handler); token.Wait() && token.Error() != nil {
+		fmt.Println(token.Error())
+		os.Exit(1)
+	}
+}
+
+func (m *MQTT) Publish(topic string, qos byte, retained bool, payload interface{}) {
+	if token := m.client.Publish(topic, qos, retained, payload); token.Wait() && token.Error() != nil {
+		fmt.Println(token.Error())
+		// Do not exit here as it might break during production, just log the error
+		// os.Exit(1)
+	}
 }
