@@ -36,10 +36,12 @@ func main() {
 	m.AddHandler("automation/presence/+", p.PresenceHandler)
 
 	// Smart home
-	service := smarthome.NewService(&m)
+	provider := device.NewProvider(&m)
+
+	provider.AddDevice(device.NewComputer("30:9c:23:60:9c:13", "Zeus", "Living Room"))
 
 	r := mux.NewRouter()
-	r.HandleFunc("/assistant", service.FullfillmentHandler)
+	r.HandleFunc("/assistant", provider.Service.FullfillmentHandler)
 
 	// Event loop
 	go func() {

@@ -10,6 +10,7 @@ type DeviceInterface interface {
 	Sync() *Device
 	Query() DeviceState
 	Execute(execution Execution, updatedState *DeviceState) (errCode string, online bool)
+	GetID() string
 }
 
 // https://developers.google.com/assistant/smarthome/reference/intent/sync

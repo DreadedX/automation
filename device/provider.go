@@ -1,4 +1,4 @@
-package smarthome
+package device
 
 import (
 	"automation/integration/google"
@@ -26,13 +26,14 @@ type DeviceInfo struct {
 }
 
 type Provider struct {
-	service *google.Service
+	Service *google.Service
 	userID string
 
 	devices map[string]google.DeviceInterface
+	manualDevices map[string]google.DeviceInterface
 }
 
-func NewService(m *mqtt.MQTT) *google.Service {
+func NewProvider(m *mqtt.MQTT) *Provider {
 	credentials64, _ := os.LookupEnv("GOOGLE_CREDENTIALS")
 	credentials, err := base64.StdEncoding.DecodeString(credentials64)
 	if err != nil {
@@ -40,15 +41,16 @@ func NewService(m *mqtt.MQTT) *google.Service {
 		os.Exit(1)
 	}
 
-	provider := &Provider{userID: "Dreaded_X", devices: make(map[string]google.DeviceInterface)}
+	provider := &Provider{userID: "Dreaded_X", devices: make(map[string]google.DeviceInterface), manualDevices: make(map[string]google.DeviceInterface)}
 
 	homegraphService, err := homegraph.NewService(context.Background(), option.WithCredentialsJSON(credentials))
 	if err != nil {
 		panic(err)
 	}
 
-	provider.service = google.NewService(provider, homegraphService)
+	provider.Service = google.NewService(provider, homegraphService)
 
+	// Auto populate and update the device list
 	m.AddHandler("zigbee2mqtt/bridge/devices", func(_ paho.Client, msg paho.Message) {
 		var devices []DeviceInfo
 		json.Unmarshal(msg.Payload(), &devices)
@@ -56,22 +58,28 @@ func NewService(m *mqtt.MQTT) *google.Service {
 		log.Println("zigbee2mqtt devices:")
 		pretty.Logln(devices)
 
-		// Clear the list of devices in order to update it
-		provider.devices = make(map[string]google.DeviceInterface)
+		// Remove all automatically added devices
+		provider.devices = provider.manualDevices
+
 		for _, device := range devices {
 			switch device.Description {
 			case "Kettle":
-				outlet := NewKettle(device, m, provider.service)
+				outlet := NewKettle(device, m, provider.Service)
 				provider.devices[device.IEEEAdress] = outlet
 				log.Printf("Added Kettle (%s) %s\n", device.IEEEAdress, device.FriendlyName)
 			}
 		}
 
 		// Send sync request
-		provider.service.RequestSync(context.Background(), provider.userID)
+		provider.Service.RequestSync(context.Background(), provider.userID)
 	})
 
-	return provider.service
+	return provider
+}
+
+func (p *Provider) AddDevice(device google.DeviceInterface) {
+	p.devices[device.GetID()] = device
+	p.manualDevices[device.GetID()] = device
 }
 
 func (p *Provider) Sync(_ context.Context, _ string) ([]*google.Device, error) {

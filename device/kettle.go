@@ -1,4 +1,4 @@
-package smarthome
+package device
 
 import (
 	"automation/integration/mqtt"
@@ -13,7 +13,7 @@ import (
 	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
-type outlet struct {
+type kettle struct {
 	Info DeviceInfo
 	m *mqtt.MQTT
 	updated chan bool
@@ -22,12 +22,12 @@ type outlet struct {
 	online bool
 }
 
-func (o *outlet) getState() google.DeviceState {
-	return google.NewDeviceState(o.online).RecordOnOff(o.isOn)
+func (k *kettle) getState() google.DeviceState {
+	return google.NewDeviceState(k.online).RecordOnOff(k.isOn)
 }
 
-func NewKettle(info DeviceInfo, m *mqtt.MQTT, s *google.Service) *outlet {
-	o := &outlet{Info: info, m: m, updated: make(chan bool, 1)}
+func NewKettle(info DeviceInfo, m *mqtt.MQTT, s *google.Service) *kettle {
+	k := &kettle{Info: info, m: m, updated: make(chan bool, 1)}
 
 	const length = 5 * time.Minute
 	timer := time.NewTimer(length)
@@ -41,45 +41,45 @@ func NewKettle(info DeviceInfo, m *mqtt.MQTT, s *google.Service) *outlet {
 		}
 	}()
 
-	o.m.AddHandler(fmt.Sprintf("zigbee2mqtt/%s", o.Info.FriendlyName), func (_ paho.Client, msg paho.Message)  {
+	k.m.AddHandler(fmt.Sprintf("zigbee2mqtt/%s", k.Info.FriendlyName), func (_ paho.Client, msg paho.Message)  {
 		var payload struct {
 			State string `json:"state"`
 		}
 		json.Unmarshal(msg.Payload(), &payload)
 
 		// Update the internal state
-		o.isOn = payload.State == "ON"
-		o.online = true
+		k.isOn = payload.State == "ON"
+		k.online = true
 
 		// Notify that the state has updated
-		for len(o.updated) > 0 {
-			<- o.updated
+		for len(k.updated) > 0 {
+			<- k.updated
 		}
-		o.updated <- true
+		k.updated <- true
 
 		// Notify google of the updated state
-		id := o.Info.IEEEAdress
+		id := k.GetID()
 		s.ReportState(context.Background(), id, map[string]google.DeviceState{
-			id: o.getState(),
+			id: k.getState(),
 		})
 
-		if o.isOn {
+		if k.isOn {
 			timer.Reset(length)
 		} else {
 			timer.Stop()
 		}
 	})
 
-	o.m.Publish(fmt.Sprintf("zigbee2mqtt/%s/get", o.Info.FriendlyName), 1, false, `{ "state": "" }`)
+	k.m.Publish(fmt.Sprintf("zigbee2mqtt/%s/get", k.Info.FriendlyName), 1, false, `{ "state": "" }`)
 
-	return o
+	return k
 }
 
-func (o* outlet) Sync() *google.Device {
-	device := google.NewDevice(o.Info.IEEEAdress, google.TypeKettle)
+func (k *kettle) Sync() *google.Device {
+	device := google.NewDevice(k.GetID(), google.TypeKettle)
 	device.AddOnOffTrait(false, false)
 
-	s := strings.Split(o.Info.FriendlyName, "/")
+	s := strings.Split(k.Info.FriendlyName, "/")
 	room := ""
 	name := s[0]
 	if len(s) > 1 {
@@ -102,21 +102,21 @@ func (o* outlet) Sync() *google.Device {
 	}
 
 	device.DeviceInfo = google.DeviceInfo{
-		Manufacturer: o.Info.Manufacturer,
-		Model: o.Info.ModelID,
-		SwVersion: o.Info.SoftwareBuildID,
+		Manufacturer: k.Info.Manufacturer,
+		Model: k.Info.ModelID,
+		SwVersion: k.Info.SoftwareBuildID,
 	}
 
-	o.m.Publish(fmt.Sprintf("zigbee2mqtt/%s/get", o.Info.FriendlyName), 1, false, `{ "state": "" }`)
+	k.m.Publish(fmt.Sprintf("zigbee2mqtt/%s/get", k.Info.FriendlyName), 1, false, `{ "state": "" }`)
 
 	return device
 }
 
-func (o *outlet) Query() google.DeviceState {
+func (k *kettle) Query() google.DeviceState {
 	// We just report out internal representation as it should always match the actual state
-	state := o.getState()
+	state := k.getState()
 	// No /get needed
-	if o.online {
+	if k.online {
 		state.Status = google.StatusSuccess
 	} else {
 		state.Status = google.StatusOffline
@@ -125,7 +125,7 @@ func (o *outlet) Query() google.DeviceState {
 	return state
 }
 
-func (o *outlet) Execute(execution google.Execution, updatedState *google.DeviceState) (string, bool) {
+func (k *kettle) Execute(execution google.Execution, updatedState *google.DeviceState) (string, bool) {
 	errCode := ""
 
 	switch execution.Name {
@@ -136,24 +136,24 @@ func (o *outlet) Execute(execution google.Execution, updatedState *google.Device
 		}
 
 		// Clear the updated channel
-		for len(o.updated) > 0 {
-			<- o.updated
+		for len(k.updated) > 0 {
+			<- k.updated
 		}
 		// Update the state
-		o.m.Publish(fmt.Sprintf("zigbee2mqtt/%s/set", o.Info.FriendlyName), 1, false, fmt.Sprintf(`{ "state": "%s" }`, state))
+		k.m.Publish(fmt.Sprintf("zigbee2mqtt/%s/set", k.Info.FriendlyName), 1, false, fmt.Sprintf(`{ "state": "%s" }`, state))
 
 		// Start timeout timer
 		timer := time.NewTimer(time.Second)
 
 		// Wait for the update or timeout
 		select {
-			case <- o.updated:
-				updatedState.RecordOnOff(o.isOn)
+			case <- k.updated:
+				updatedState.RecordOnOff(k.isOn)
 
 			case <- timer.C:
 				// If we do not get a response in time mark the device as offline
 				log.Println("Device did not respond, marking as offline")
-				o.online = false
+				k.online = false
 		}
 
 	default:
@@ -162,5 +162,9 @@ func (o *outlet) Execute(execution google.Execution, updatedState *google.Device
 		log.Printf("Command (%s) not supported\n", execution.Name)
 	}
 
-	return errCode, o.online
+	return errCode, k.online
+}
+
+func (k *kettle) GetID() string {
+	return k.Info.IEEEAdress
 }
