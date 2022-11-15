@@ -38,7 +38,10 @@ steps:
 
           - docker rm automation || true
 
-          - docker run -e MQTT_HOST=$MQTT_HOST -e MQTT_PORT=$MQTT_PORT -e MQTT_USER=$MQTT_USER -e MQTT_PASS=$MQTT_PASS -e MQTT_CLIENT_ID=$MQTT_CLIENT_ID -e HUE_IP=$HUE_IP -e HUE_BRIDGE=$HUE_BRIDGE -e NTFY_TOPIC=$NTFY_TOPIC -e GOOGLE_CREDENTIALS=$GOOGLE_CREDENTIALS --network mqtt --network web --name automation -d automation
+          - docker create -e MQTT_HOST=$MQTT_HOST -e MQTT_PORT=$MQTT_PORT -e MQTT_USER=$MQTT_USER -e MQTT_PASS=$MQTT_PASS -e MQTT_CLIENT_ID=$MQTT_CLIENT_ID -e HUE_IP=$HUE_IP -e HUE_BRIDGE=$HUE_BRIDGE -e NTFY_TOPIC=$NTFY_TOPIC -e GOOGLE_CREDENTIALS=$GOOGLE_CREDENTIALS --network mqtt --name automation automation
+          - docker network connect mqtt automation
+          - docker network connect web automation
+          - docker start automation
 
       when:
         branch:
