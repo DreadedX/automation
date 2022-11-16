@@ -14,5 +14,6 @@ FROM golang:alpine
 
 WORKDIR /app
 COPY --from=build-automation /src/automation /app/automation
+COPY --from=build-automation /src/config.yml /app/config.yml
 
 CMD ["/app/automation"]

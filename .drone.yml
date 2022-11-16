@@ -17,18 +17,10 @@ steps:
           - name: socket
             path: /var/run/docker.sock
       environment:
-          MQTT_HOST:
-              from_secret: MQTT_HOST
-          MQTT_PORT:
-              from_secret: MQTT_PORT
-          MQTT_USER:
-              from_secret: MQTT_USER
-          MQTT_PASS:
-              from_secret: MQTT_PASS
-          HUE_IP:
-              from_secret: HUE_IP
-          HUE_BRIDGE:
-              from_secret: HUE_BRIDGE
+          MQTT_PASSWORD:
+              from_secret: MQTT_PASSWORD
+          HUE_TOKEN:
+              from_secret: HUE_TOKEN
           NTFY_TOPIC:
               from_secret: NTFY_TOPIC
           GOOGLE_CREDENTIALS:
@@ -38,7 +30,7 @@ steps:
 
           - docker rm automation || true
 
-          - docker create -e MQTT_HOST=$MQTT_HOST -e MQTT_PORT=$MQTT_PORT -e MQTT_USER=$MQTT_USER -e MQTT_PASS=$MQTT_PASS -e MQTT_CLIENT_ID=$MQTT_CLIENT_ID -e HUE_IP=$HUE_IP -e HUE_BRIDGE=$HUE_BRIDGE -e NTFY_TOPIC=$NTFY_TOPIC -e GOOGLE_CREDENTIALS=$GOOGLE_CREDENTIALS --network mqtt --name automation automation
+          - docker create -e MQTT_PASSWORD=$MQTT_PASSWORD -e HUE_TOKEN=$HUE_TOKEN -e NTFY_TOPIC=$NTFY_TOPIC -e GOOGLE_CREDENTIALS=$GOOGLE_CREDENTIALS --network mqtt --name automation automation
           - docker network connect mqtt automation
           - docker network connect web automation
           - docker start automation
