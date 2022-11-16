@@ -2,7 +2,7 @@ hue:
   ip: 10.0.0.146
 
 mqtt:
-  host: tls://olympus.lan.huizinga.dev
+  host: mosquitto
   port: 8883
   username: mqtt
   client_id: automation
