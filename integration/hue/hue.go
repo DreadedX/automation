@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/r3labs/sse/v2"
 )
@@ -38,11 +37,8 @@ func (hue *Hue) SetFlag(id int, value bool) {
 	}
 }
 
-func Connect() Hue {
-	login, _ := os.LookupEnv("HUE_BRIDGE")
-	ip, _ := os.LookupEnv("HUE_IP")
-
-	hue := Hue{ip: ip, login: login, Events: make(chan *sse.Event)}
+func Connect(config Config) Hue {
+	hue := Hue{ip: config.IP, login: config.Token, Events: make(chan *sse.Event)}
 
 	// Subscribe to eventstream
 	client := sse.NewClient(fmt.Sprintf("https://%s/eventstream/clip/v2", hue.ip))

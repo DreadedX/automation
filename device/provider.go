@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"log"
-	"os"
 
 	"github.com/kr/pretty"
 	"google.golang.org/api/homegraph/v1"
@@ -38,17 +37,22 @@ type Provider struct {
 	manualDevices map[string]DeviceInterface
 }
 
-func NewProvider(m *mqtt.MQTT) *Provider {
-	credentials64, _ := os.LookupEnv("GOOGLE_CREDENTIALS")
-	credentials, err := base64.StdEncoding.DecodeString(credentials64)
-	if err != nil {
-		log.Println(err)
-		os.Exit(1)
-	}
+type credentials []byte
+type Config struct {
+	Credentials credentials `yaml:"credentials" envconfig:"GOOGLE_CREDENTIALS"`
+}
 
+func (c *credentials) Decode(value string) error {
+	b, err := base64.StdEncoding.DecodeString(value)
+	*c = b
+
+	return err
+}
+
+func NewProvider(config Config, m *mqtt.MQTT) *Provider {
 	provider := &Provider{userID: "Dreaded_X", devices: make(map[string]DeviceInterface), manualDevices: make(map[string]DeviceInterface)}
 
-	homegraphService, err := homegraph.NewService(context.Background(), option.WithCredentialsJSON(credentials))
+	homegraphService, err := homegraph.NewService(context.Background(), option.WithCredentialsJSON(config.Credentials))
 	if err != nil {
 		panic(err)
 	}

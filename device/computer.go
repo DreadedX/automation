@@ -10,9 +10,10 @@ type computer struct {
 	macAddress string
 	name string
 	room string
+	url string
 }
 
-func NewComputer(macAddress string, name string, room string) *computer {
+func NewComputer(macAddress string, name string, room string, url string) *computer {
 	c := &computer{macAddress: macAddress, name: name, room: room}
 
 	return c
@@ -46,10 +47,7 @@ func (c *computer) Execute(execution google.Execution, updateState *google.Devic
 	switch execution.Name {
 	case google.CommandActivateScene:
 		if !execution.ActivateScene.Deactivate {
-			// @NOTE For now just call the webhook, that way we do not have to give this docker container network_mode: host
-			// @TODO Add wake on lan support
-
-			http.Get("https://webhook.huizinga.dev/start-pc?token=7!$8bmjfZsT606Rmw5IrfIXhQWt6clTY")
+			http.Get(c.url)
 		}
 	default:
 		errCode = "actionNotAvailable"

@@ -1,0 +1,19 @@
+hue:
+  ip: 10.0.0.146
+
+mqtt:
+  host: tls://olympus.lan.huizinga.dev
+  port: 8883
+  username: mqtt
+  client_id: automation
+
+kasa:
+  outlets:
+    mixer: 10.0.0.49
+    speakers: 10.0.0.182
+
+computers:
+  zeus:
+    mac: 30:9c:23:60:9c:13
+    room: Living Room
+    url: http://10.0.0.2:9000/start-pc?mac=30:9c:23:60:9c:13

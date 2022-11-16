@@ -17,33 +17,12 @@ var defaultHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 	fmt.Printf("MSG: %s\n", msg.Payload())
 }
 
-func Connect() MQTT {
-	host, ok := os.LookupEnv("MQTT_HOST")
-	if !ok {
-		host = "localhost"
-	}
-	port, ok := os.LookupEnv("MQTT_PORT")
-	if !ok {
-		port = "1883"
-	}
-	user, ok := os.LookupEnv("MQTT_USER")
-	if !ok {
-		user = "test"
-	}
-	pass, ok := os.LookupEnv("MQTT_PASS")
-	if !ok {
-		pass = "test"
-	}
-	clientID, ok := os.LookupEnv("MQTT_CLIENT_ID")
-	if !ok {
-		clientID = "automation"
-	}
-
-	opts := mqtt.NewClientOptions().AddBroker(fmt.Sprintf("%s:%s", host, port))
-	opts.SetClientID(clientID)
+func Connect(config Config) MQTT {
+	opts := mqtt.NewClientOptions().AddBroker(fmt.Sprintf("%s:%s", config.Host, config.Port))
+	opts.SetClientID(config.ClientID)
 	opts.SetDefaultPublishHandler(defaultHandler)
-	opts.SetUsername(user)
-	opts.SetPassword(pass)
+	opts.SetUsername(config.Username)
+	opts.SetPassword(config.Password)
 
 	client := mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {

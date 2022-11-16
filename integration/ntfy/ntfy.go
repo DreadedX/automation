@@ -3,12 +3,11 @@ package ntfy
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 )
 
 type ntfy struct {
-	topic string
+	presence string
 }
 
 func (ntfy *ntfy) Presence(home bool) {
@@ -23,7 +22,7 @@ func (ntfy *ntfy) Presence(home bool) {
 		actions = "broadcast, Set as home, extras.cmd=presence, extras.state=1, clear=true"
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("https://ntfy.sh/%s", ntfy.topic), strings.NewReader(description))
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://ntfy.sh/%s", ntfy.presence), strings.NewReader(description))
 	if err != nil {
 		panic(err)
 	}
@@ -36,9 +35,8 @@ func (ntfy *ntfy) Presence(home bool) {
 	http.DefaultClient.Do(req)
 }
 
-func Connect() ntfy {
-	topic, _ := os.LookupEnv("NTFY_TOPIC")
-	ntfy := ntfy{topic}
+func Connect(config Config) ntfy {
+	ntfy := ntfy{presence: config.Presence}
 
 	// @TODO Make sure the topic is valid?
 
