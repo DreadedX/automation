@@ -61,10 +61,69 @@ func GetConfig() config {
 	return cfg
 }
 
+var devices map[string]interface{}
+
+// // @TODO Implement this for the other devices as well
+// func GetDeviceKasa(name string) (*kasa.Kasa, error) {
+// 	deviceGeneric, ok := devices[name]
+// 	if !ok {
+// 		return nil, fmt.Errorf("Device does not exist")
+// 	}
+
+// 	device, ok := deviceGeneric.(kasa.Kasa)
+// 	if !ok {
+// 		return nil, fmt.Errorf("Device is not a Kasa device")
+// 	}
+
+// 	return &device, nil
+// }
+
+// func SetupBindings(m *mqtt.MQTT) {
+// 	m.AddHandler("zigbee2mqtt/living_room/audio_remote", func(_ paho.Client, msg paho.Message) {
+// 		mixer, err := GetDeviceKasa("living_room/mixer")
+// 		if err != nil {
+// 			log.Println(err)
+// 			return
+// 		}
+// 		speakers, err := GetDeviceKasa("living_room/speakers")
+// 		if err != nil {
+// 			log.Println(err)
+// 			return
+// 		}
+
+// 		var message struct {
+// 			Action string `json:"action"`
+// 		}
+// 		err = json.Unmarshal(msg.Payload(), &message)
+// 		if err != nil {
+// 			log.Println(err)
+// 			return
+// 		}
+
+// 		if message.Action == "on" {
+// 			if mixer.GetState() {
+// 				mixer.SetState(false)
+// 				speakers.SetState(false)
+// 			} else {
+// 				mixer.SetState(true)
+// 			}
+// 		} else if message.Action == "brightness_move_up" {
+// 			if speakers.GetState() {
+// 				speakers.SetState(false)
+// 			} else {
+// 				speakers.SetState(true)
+// 				mixer.SetState(true)
+// 			}
+// 		}
+// 	})
+// }
+
 func main() {
 	_ = godotenv.Load()
 
 	config := GetConfig()
+
+	devices = make(map[string]interface{})
 
 	// MQTT
 	m := mqtt.Connect(config.MQTT)
@@ -74,9 +133,8 @@ func main() {
 	h := hue.Connect(config.Hue)
 
 	// Kasa
-	kasaDevices := make(map[string]kasa.Kasa)
 	for name, ip := range config.Kasa.Outlets {
-		kasaDevices[name] = kasa.New(ip)
+		devices[name] = kasa.New(ip)
 	}
 
 	// ntfy.sh
@@ -113,9 +171,14 @@ func main() {
 					// Turn off all the devices that we manage ourselves
 					provider.TurnAllOff()
 
-					// Turn off kasa devices
-					for _, device := range kasaDevices {
-						device.SetState(false)
+					// Turn off all devices
+					// @TODO Maybe allow for exceptions, could be a list in the config that we check against?
+					for _, device := range devices {
+						switch d := device.(type) {
+						case kasa.Kasa:
+							d.SetState(false)
+
+						}
 					}
 
 					// @TODO Turn off nest thermostat

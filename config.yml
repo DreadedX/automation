@@ -9,8 +9,8 @@ mqtt:
 
 kasa:
   outlets:
-    mixer: 10.0.0.49
-    speakers: 10.0.0.182
+    living_room/mixer: 10.0.0.49
+    living_room/speakers: 10.0.0.182
 
 computers:
   zeus:
