@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jellydator/ttlcache/v3"
 	"google.golang.org/api/homegraph/v1"
 )
 
@@ -30,13 +32,21 @@ type Provider interface {
 type Service struct {
 	provider      Provider
 	deviceService *homegraph.DevicesService
+	cache         *ttlcache.Cache[string, string]
 }
 
 func NewService(provider Provider, service *homegraph.Service) *Service {
-	return &Service{
+	s := Service{
 		provider:      provider,
 		deviceService: homegraph.NewDevicesService(service),
+		cache: ttlcache.New(
+			ttlcache.WithTTL[string, string](30 * time.Minute),
+		),
 	}
+
+	go s.cache.Start()
+
+	return &s
 }
 
 func (s *Service) RequestSync(ctx context.Context, userID string) error {
@@ -69,7 +79,7 @@ func (s *Service) ReportState(ctx context.Context, userID string, states map[str
 		RequestId:   uuid.New().String(),
 		Payload: &homegraph.StateAndNotificationPayload{
 			Devices: &homegraph.ReportStateAndNotificationDevice{
-				States:        j,
+				States: j,
 			},
 		},
 	})

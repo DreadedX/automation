@@ -2,8 +2,11 @@ package google
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
+
+	"github.com/jellydator/ttlcache/v3"
 )
 
 type DeviceInterface interface {
@@ -50,38 +53,78 @@ type executeResponse struct {
 	} `json:"payload"`
 }
 
+// @TODO We can also implement this as a cache loader function
+// Note sure how to report the correct errors in that case?
+func (s *Service) getUser(authorization string) (string, int) {
+	// @TODO Make oids url configurable
+
+	cached := s.cache.Get(authorization)
+	if cached != nil {
+		return cached.Value(), http.StatusOK
+	}
+
+	req, err := http.NewRequest("GET", "https://login.huizinga.dev/api/oidc/userinfo", nil)
+	if err != nil {
+		log.Println("Failed to make request to to login server")
+		return "", http.StatusInternalServerError
+	}
+
+	req.Header.Set("Authorization", authorization)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
+	// If we get something other than 200, error out
+	if resp.StatusCode != http.StatusOK {
+		log.Println("Not logged in...")
+		return "", resp.StatusCode
+	}
+
+	// Get the preferred_username from the userinfo
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Println("Failed to read body")
+		return "", resp.StatusCode
+	}
+
+	var body struct {
+		PreferredUsername string `json:"preferred_username"`
+	}
+
+	err = json.Unmarshal(bodyBytes, &body)
+	if err != nil {
+		log.Println("Failed to marshal body")
+		return "", http.StatusInternalServerError
+	}
+
+	if len(body.PreferredUsername) == 0 {
+		log.Println("Received empty username from userinfo endpoint")
+		return "", http.StatusInternalServerError
+	}
+
+	s.cache.Set(authorization, body.PreferredUsername, ttlcache.DefaultTTL)
+
+	return body.PreferredUsername, http.StatusOK
+}
+
 func (s *Service) FullfillmentHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	// Check if we are logged in
-	{
-		req, err := http.NewRequest("GET", "https://login.huizinga.dev/api/oidc/userinfo", nil)
-		if err != nil {
-			log.Println("Failed to make request to to login server")
-			w.WriteHeader(http.StatusInternalServerError)
+	var userID string
+	if auth, ok := r.Header["Authorization"]; ok && len(auth) > 0 {
+		var statusCode int
+		userID, statusCode = s.getUser(auth[0])
+		if statusCode != http.StatusOK {
+			w.WriteHeader(statusCode)
 			return
 		}
-
-		if len(r.Header["Authorization"]) > 0 {
-			req.Header.Set("Authorization", r.Header["Authorization"][0])
-		}
-		client := &http.Client{}
-		resp, err := client.Do(req)
-
-		// If we get something other than 200, error out
-		if resp.StatusCode != http.StatusOK {
-			log.Println("Not logged in...")
-			w.WriteHeader(resp.StatusCode)
-			return
-		}
+	} else {
+		log.Println("No authorization provided")
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
-	// @TODO Make sure we receive content type json
-	// @TODO Get this from userinfo, currently the scope is not set up properly to actually receive the username
-	userID := "Dreaded_X"
-
 	fullfimentReq := &FullfillmentRequest{}
-
 	err := json.NewDecoder(r.Body).Decode(&fullfimentReq)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
