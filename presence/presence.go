@@ -1,40 +1,48 @@
 package presence
 
 import (
-	"fmt"
-	"strconv"
+	"encoding/json"
+	"log"
 	"strings"
+	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/kr/pretty"
 )
 
 type Presence struct {
-	Presence chan bool
-	devices map[string]bool
-	current *bool
+	devices  map[string]bool
+	current  *bool
+}
+
+type Message struct {
+	State   bool  `json:"state"`
+	Updated int64 `json:"updated"`
 }
 
 func New() Presence {
-	return Presence{Presence: make(chan bool), devices: make(map[string]bool), current: nil}
+	return Presence{devices: make(map[string]bool), current: nil}
 }
 
 // Handler got automation/presence/+
 func (p *Presence) PresenceHandler(client mqtt.Client, msg mqtt.Message) {
 	name := strings.Split(msg.Topic(), "/")[2]
+
 	if len(msg.Payload()) == 0 {
-		// @TODO What happens if we delete a device that does not exist
 		delete(p.devices, name)
 	} else {
-		value, err := strconv.Atoi(string(msg.Payload()))
+		var message Message
+		err := json.Unmarshal(msg.Payload(), &message)
 		if err != nil {
-			panic(err)
+			log.Println(err)
+			return
 		}
 
-		p.devices[name] = value == 1
+		p.devices[name] = message.State
 	}
 
 	present := false
-	fmt.Println(p.devices)
+	pretty.Println(p.devices)
 	for _, value := range p.devices {
 		if value {
 			present = true
@@ -42,9 +50,23 @@ func (p *Presence) PresenceHandler(client mqtt.Client, msg mqtt.Message) {
 		}
 	}
 
+	log.Println(present)
+
 	if p.current == nil || *p.current != present {
 		p.current = &present
-		p.Presence <- present
+
+		msg, err := json.Marshal(Message{
+			State:   present,
+			Updated: time.Now().UnixMilli(),
+		})
+
+		if err != nil {
+			log.Println(err)
+		}
+
+		token := client.Publish("automation/presence", 1, true, msg)
+		if token.Wait() && token.Error() != nil {
+			log.Println(token.Error())
+		}
 	}
 }
-

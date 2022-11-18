@@ -23,6 +23,7 @@ func Connect(config Config) MQTT {
 	opts.SetDefaultPublishHandler(defaultHandler)
 	opts.SetUsername(config.Username)
 	opts.SetPassword(config.Password)
+	opts.SetOrderMatters(false)
 
 	client := mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {

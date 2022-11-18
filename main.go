@@ -7,6 +7,7 @@ import (
 	"automation/integration/mqtt"
 	"automation/integration/ntfy"
 	"automation/presence"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -16,6 +17,8 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v3"
+
+	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
 type config struct {
@@ -138,11 +141,7 @@ func main() {
 	}
 
 	// ntfy.sh
-	n := ntfy.Connect(config.NTFY)
-
-	// Presence
-	p := presence.New()
-	m.AddHandler("automation/presence/+", p.PresenceHandler)
+	// n := ntfy.Connect(config.NTFY)
 
 	// Devices that we control and expose to google home
 	provider := device.NewProvider(config.Google, &m)
@@ -154,43 +153,48 @@ func main() {
 		provider.AddDevice(device.NewComputer(info.MACAddress, name, info.Room, info.Url))
 	}
 
-	// Event loop
-	go func() {
-		fmt.Println("Starting event loop")
-		for {
-			select {
-			case present := <-p.Presence:
-				fmt.Printf("Presence: %t\n", present)
-				// Notify users of presence update
-				n.Presence(present)
+	// Presence
+	p := presence.New()
+	m.AddHandler("automation/presence/+", p.PresenceHandler)
 
-				// Set presence on the hue bridge
-				h.SetFlag(41, present)
-
-				if !present {
-					// Turn off all the devices that we manage ourselves
-					provider.TurnAllOff()
-
-					// Turn off all devices
-					// @TODO Maybe allow for exceptions, could be a list in the config that we check against?
-					for _, device := range devices {
-						switch d := device.(type) {
-						case kasa.Kasa:
-							d.SetState(false)
-
-						}
-					}
-
-					// @TODO Turn off nest thermostat
-				} else {
-					// @TODO Turn on the nest thermostat again
-				}
-
-			case <-h.Events:
-				break
-			}
+	m.AddHandler("automation/presence", func(client paho.Client, msg paho.Message) {
+		if len(msg.Payload()) == 0 {
+			// In this case we clear the persistent message
+			return
 		}
-	}()
+		var message presence.Message
+		err := json.Unmarshal(msg.Payload(), &message)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		fmt.Printf("Presence: %t\n", message.State)
+		// Notify users of presence update
+		// n.Presence(present)
+
+		// Set presence on the hue bridge
+		h.SetFlag(41, message.State)
+
+		if !message.State {
+			// Turn off all the devices that we manage ourselves
+			provider.TurnAllOff()
+
+			// Turn off all devices
+			// @TODO Maybe allow for exceptions, could be a list in the config that we check against?
+			for _, device := range devices {
+				switch d := device.(type) {
+				case kasa.Kasa:
+					d.SetState(false)
+
+				}
+			}
+
+			// @TODO Turn off nest thermostat
+		} else {
+			// @TODO Turn on the nest thermostat again
+		}
+	})
 
 	addr := ":8090"
 	srv := http.Server{
