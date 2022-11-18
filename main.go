@@ -1,7 +1,6 @@
 package main
 
 import (
-	"automation/connect"
 	"automation/device"
 	"automation/integration/hue"
 	"automation/integration/kasa"
@@ -19,9 +18,22 @@ import (
 )
 
 type config struct {
-	Hue  hue.Config  `yaml:"hue"`
-	NTFY ntfy.Config `yaml:"ntfy"`
-	MQTT mqtt.Config `yaml:"mqtt"`
+	Hue struct {
+		Token string `yaml:"token" envconfig:"HUE_TOKEN"`
+		IP    string `yaml:"ip" envconfig:"HUE_IP"`
+	} `yaml:"hue"`
+
+	NTFY struct {
+		topic string `yaml:"topic" envconfig:"NTFY_TOPIC"`
+	} `yaml:"ntfy"`
+
+	MQTT struct {
+		Host     string `yaml:"host" envconfig:"MQTT_HOST"`
+		Port     int    `yaml:"port" envconfig:"MQTT_PORT"`
+		Username string `yaml:"username" envconfig:"MQTT_USERNAME"`
+		Password string `yaml:"password" envconfig:"MQTT_PASSWORD"`
+		ClientID string `yaml:"client_id" envconfig:"MQTT_CLIENT_ID"`
+	} `yaml:"mqtt"`
 
 	Kasa struct {
 		Outlets map[string]string `yaml:"outlets"`
@@ -125,25 +137,23 @@ func main() {
 
 	devices = make(map[string]interface{})
 
-	var connect connect.Connect
+	// Setup all the connections to other services
+	client := mqtt.New(config.MQTT.Host, config.MQTT.Port, config.MQTT.ClientID, config.MQTT.Username, config.MQTT.Password)
+	defer client.Disconnect(250)
+	notify := ntfy.New(config.NTFY.topic)
+	hue := hue.New(config.Hue.IP, config.Hue.Token)
 
-	// MQTT
-	connect.Client = mqtt.New(config.MQTT)
-	defer connect.Client.Disconnect(250)
+	// Setup presence system
+	p := presence.New(client, hue, notify)
+	defer p.Delete()
 
-	// ntfy.sh
-	connect.Notify = ntfy.New(config.NTFY)
-
-	// Hue
-	connect.Hue = hue.Connect(config.Hue)
-
-	// Kasa
+	// Register all kasa devies
 	for name, ip := range config.Kasa.Outlets {
 		devices[name] = kasa.New(ip)
 	}
 
 	// Devices that we control and expose to google home
-	provider := device.NewProvider(config.Google, connect.Client)
+	provider := device.NewProvider(config.Google, client)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/assistant", provider.Service.FullfillmentHandler)
@@ -153,8 +163,6 @@ func main() {
 	}
 
 	// Presence
-	p := presence.New(&connect)
-	defer p.Delete()
 
 	addr := ":8090"
 	srv := http.Server{

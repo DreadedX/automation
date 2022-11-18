@@ -1,7 +1,8 @@
 package presence
 
 import (
-	"automation/connect"
+	"automation/integration/hue"
+	"automation/integration/ntfy"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,7 +14,10 @@ import (
 )
 
 type Presence struct {
-	connect *connect.Connect
+	client paho.Client
+	hue *hue.Hue
+	ntfy *ntfy.Notify
+
 	devices  map[string]bool
 	presence  bool
 }
@@ -83,10 +87,10 @@ func (p *Presence) overallPresenceHandler(client paho.Client, msg paho.Message) 
 
 	fmt.Printf("Presence: %t\n", message.State)
 	// Notify users of presence update
-	p.connect.Notify.Presence(p.presence)
+	p.ntfy.Presence(p.presence)
 
 	// Set presence on the hue bridge
-	p.connect.Hue.SetFlag(41, message.State)
+	p.hue.SetFlag(41, message.State)
 
 	if !message.State {
 		log.Println("Turn off all the devices")
@@ -109,14 +113,14 @@ func (p *Presence) overallPresenceHandler(client paho.Client, msg paho.Message) 
 	}
 }
 
-func New(connect *connect.Connect) *Presence {
-	p := &Presence{connect: connect, devices: make(map[string]bool), presence: false}
+func New(client paho.Client, hue *hue.Hue, ntfy *ntfy.Notify) *Presence {
+	p := &Presence{client: client, hue: hue, ntfy: ntfy, devices: make(map[string]bool), presence: false}
 
-	if token := connect.Client.Subscribe("automation/presence", 1, p.overallPresenceHandler); token.Wait() && token.Error() != nil {
+	if token := p.client.Subscribe("automation/presence", 1, p.overallPresenceHandler); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 
-	if token := connect.Client.Subscribe("automation/presence/+", 1, p.devicePresenceHandler); token.Wait() && token.Error() != nil {
+	if token := p.client.Subscribe("automation/presence/+", 1, p.devicePresenceHandler); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 
@@ -124,11 +128,11 @@ func New(connect *connect.Connect) *Presence {
 }
 
 func (p *Presence) Delete() {
-	if token := p.connect.Client.Unsubscribe("automation/presence"); token.Wait() && token.Error() != nil {
+	if token := p.client.Unsubscribe("automation/presence"); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 
-	if token := p.connect.Client.Unsubscribe("automation/presence/+"); token.Wait() && token.Error() != nil {
+	if token := p.client.Unsubscribe("automation/presence/+"); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 }

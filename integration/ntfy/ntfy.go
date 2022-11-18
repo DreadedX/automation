@@ -7,7 +7,7 @@ import (
 )
 
 type Notify struct {
-	presence string
+	topic string
 }
 
 func (n *Notify) Presence(home bool) {
@@ -22,7 +22,7 @@ func (n *Notify) Presence(home bool) {
 		actions = "broadcast, Set as home, extras.cmd=presence, extras.state=1, clear=true"
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("https://ntfy.sh/%s", n.presence), strings.NewReader(description))
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://ntfy.sh/%s", n.topic), strings.NewReader(description))
 	if err != nil {
 		panic(err)
 	}
@@ -35,10 +35,10 @@ func (n *Notify) Presence(home bool) {
 	http.DefaultClient.Do(req)
 }
 
-func New(config Config) Notify {
-	ntfy := Notify{presence: config.Presence}
+func New(topic string) *Notify {
+	ntfy := Notify{topic}
 
 	// @TODO Make sure the topic is valid?
 
-	return ntfy
+	return &ntfy
 }

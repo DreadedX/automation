@@ -12,12 +12,12 @@ var defaultHandler paho.MessageHandler = func(client paho.Client, msg paho.Messa
 	fmt.Printf("MSG: %s\n", msg.Payload())
 }
 
-func New(config Config) paho.Client {
-	opts := paho.NewClientOptions().AddBroker(fmt.Sprintf("%s:%s", config.Host, config.Port))
-	opts.SetClientID(config.ClientID)
+func New(host string, port int, clientID string, username string, password string) paho.Client {
+	opts := paho.NewClientOptions().AddBroker(fmt.Sprintf("%s:%d", host, port))
+	opts.SetClientID(clientID)
 	opts.SetDefaultPublishHandler(defaultHandler)
-	opts.SetUsername(config.Username)
-	opts.SetPassword(config.Password)
+	opts.SetUsername(username)
+	opts.SetPassword(password)
 	opts.SetOrderMatters(false)
 
 	client := paho.NewClient(opts)

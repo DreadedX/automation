@@ -37,8 +37,8 @@ func (hue *Hue) SetFlag(id int, value bool) {
 	}
 }
 
-func Connect(config Config) Hue {
-	hue := Hue{ip: config.IP, login: config.Token, Events: make(chan *sse.Event)}
+func New(ip string, token string) *Hue {
+	hue := Hue{ip: ip, login: token, Events: make(chan *sse.Event)}
 
 	// Subscribe to eventstream
 	client := sse.NewClient(fmt.Sprintf("https://%s/eventstream/clip/v2", hue.ip))
@@ -52,5 +52,5 @@ func Connect(config Config) Hue {
 		panic(err)
 	}
 
-	return hue
+	return &hue
 }
