@@ -70,8 +70,6 @@ func NewKettle(info DeviceInfo, m *mqtt.MQTT, s *google.Service) *kettle {
 		}
 	})
 
-	k.m.Publish(fmt.Sprintf("zigbee2mqtt/%s/get", k.Info.FriendlyName), 1, false, `{ "state": "" }`)
-
 	return k
 }
 
