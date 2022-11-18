@@ -2,7 +2,6 @@ package device
 
 import (
 	"automation/integration/google"
-	"automation/integration/mqtt"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -26,7 +25,7 @@ type DeviceInfo struct {
 
 type DeviceInterface interface {
 	google.DeviceInterface
-	TurnOff()
+	SetState(state bool)
 }
 
 type Provider struct {
@@ -49,7 +48,31 @@ func (c *credentials) Decode(value string) error {
 	return err
 }
 
-func NewProvider(config Config, m *mqtt.MQTT) *Provider {
+// Auto populate and update the device list
+func (p *Provider) devicesHandler(client paho.Client, msg paho.Message) {
+	var devices []DeviceInfo
+	json.Unmarshal(msg.Payload(), &devices)
+
+	log.Println("zigbee2mqtt devices:")
+	pretty.Logln(devices)
+
+	// Remove all automatically added devices
+	p.devices = p.manualDevices
+
+	for _, device := range devices {
+		switch device.Description {
+		case "Kettle":
+			kettle := NewKettle(device, client, p.Service)
+			p.devices[device.IEEEAdress] = kettle
+			log.Printf("Added Kettle (%s) %s\n", device.IEEEAdress, device.FriendlyName)
+		}
+	}
+
+	// Send sync request
+	p.Service.RequestSync(context.Background(), p.userID)
+}
+
+func NewProvider(config Config, client paho.Client) *Provider {
 	provider := &Provider{userID: "Dreaded_X", devices: make(map[string]DeviceInterface), manualDevices: make(map[string]DeviceInterface)}
 
 	homegraphService, err := homegraph.NewService(context.Background(), option.WithCredentialsJSON(config.Credentials))
@@ -59,29 +82,9 @@ func NewProvider(config Config, m *mqtt.MQTT) *Provider {
 
 	provider.Service = google.NewService(provider, homegraphService)
 
-	// Auto populate and update the device list
-	m.AddHandler("zigbee2mqtt/bridge/devices", func(_ paho.Client, msg paho.Message) {
-		var devices []DeviceInfo
-		json.Unmarshal(msg.Payload(), &devices)
-
-		log.Println("zigbee2mqtt devices:")
-		pretty.Logln(devices)
-
-		// Remove all automatically added devices
-		provider.devices = provider.manualDevices
-
-		for _, device := range devices {
-			switch device.Description {
-			case "Kettle":
-				kettle := NewKettle(device, m, provider.Service)
-				provider.devices[device.IEEEAdress] = kettle
-				log.Printf("Added Kettle (%s) %s\n", device.IEEEAdress, device.FriendlyName)
-			}
-		}
-
-		// Send sync request
-		provider.Service.RequestSync(context.Background(), provider.userID)
-	})
+	if token := client.Subscribe("zigbee2mqtt/bridge/devices", 1, provider.devicesHandler); token.Wait() && token.Error() != nil {
+		log.Println(token.Error())
+	}
 
 	return provider
 }
@@ -150,6 +153,6 @@ func (p *Provider) Execute(_ context.Context, _ string, commands []google.Comman
 
 func (p *Provider) TurnAllOff() {
 	for _, device := range p.devices {
-		device.TurnOff()
+		device.SetState(false)
 	}
 }

@@ -6,11 +6,11 @@ import (
 	"strings"
 )
 
-type ntfy struct {
+type Notify struct {
 	presence string
 }
 
-func (ntfy *ntfy) Presence(home bool) {
+func (n *Notify) Presence(home bool) {
 	// @TODO Maybe add list the devices that are home currently?
 	var description string
 	var actions string
@@ -22,7 +22,7 @@ func (ntfy *ntfy) Presence(home bool) {
 		actions = "broadcast, Set as home, extras.cmd=presence, extras.state=1, clear=true"
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("https://ntfy.sh/%s", ntfy.presence), strings.NewReader(description))
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://ntfy.sh/%s", n.presence), strings.NewReader(description))
 	if err != nil {
 		panic(err)
 	}
@@ -35,8 +35,8 @@ func (ntfy *ntfy) Presence(home bool) {
 	http.DefaultClient.Do(req)
 }
 
-func Connect(config Config) ntfy {
-	ntfy := ntfy{presence: config.Presence}
+func New(config Config) Notify {
+	ntfy := Notify{presence: config.Presence}
 
 	// @TODO Make sure the topic is valid?
 

@@ -46,9 +46,7 @@ func (c *computer) Execute(execution google.Execution, updateState *google.Devic
 
 	switch execution.Name {
 	case google.CommandActivateScene:
-		if !execution.ActivateScene.Deactivate {
-			http.Get(c.url)
-		}
+		c.SetState(!execution.ActivateScene.Deactivate)
 	default:
 		errCode = "actionNotAvailable"
 		log.Printf("Command (%s) not supported\n", execution.Name)
@@ -61,6 +59,10 @@ func (c *computer) GetID() string {
 	return c.macAddress
 }
 
-func (c *computer) TurnOff() {
-	// Scene does not implement this
+func (c *computer) SetState(state bool) {
+	if state {
+		http.Get(c.url)
+	} else {
+		// Scene does not implement this
+	}
 }

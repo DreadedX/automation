@@ -1,9 +1,7 @@
 package device
 
 import (
-	"automation/integration/mqtt"
 	"automation/integration/google"
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -15,8 +13,12 @@ import (
 
 type kettle struct {
 	Info DeviceInfo
-	m *mqtt.MQTT
+	client paho.Client
 	updated chan bool
+
+	timerLength time.Duration
+	timer *time.Timer
+	stop chan interface{}
 
 	isOn bool
 	online bool
@@ -26,49 +28,67 @@ func (k *kettle) getState() google.DeviceState {
 	return google.NewDeviceState(k.online).RecordOnOff(k.isOn)
 }
 
-func NewKettle(info DeviceInfo, m *mqtt.MQTT, s *google.Service) *kettle {
-	k := &kettle{Info: info, m: m, updated: make(chan bool, 1)}
+func (k *kettle) stateHandler(client paho.Client, msg paho.Message) {
+	var payload struct {
+		State string `json:"state"`
+	}
+	json.Unmarshal(msg.Payload(), &payload)
 
-	const length = 5 * time.Minute
-	timer := time.NewTimer(length)
-	timer.Stop()
+	// Update the internal state
+	k.isOn = payload.State == "ON"
+	k.online = true
 
-	go func() {
-		for {
-			<- timer.C
+	// Notify that the state has updated
+	for len(k.updated) > 0 {
+		<- k.updated
+	}
+	k.updated <- true
+
+	// Notify google of the updated state
+	// @TODO Fix this
+	// id := k.GetID()
+	// s.ReportState(context.Background(), id, map[string]google.DeviceState{
+	// 	id: k.getState(),
+	// })
+
+	if k.isOn {
+		k.timer.Reset(k.timerLength)
+	} else {
+		k.timer.Stop()
+	}
+}
+
+func (k *kettle) timerFunc() {
+	for {
+		select {
+		case <- k.timer.C:
 			log.Println("Turning kettle automatically off")
-			m.Publish("zigbee2mqtt/kitchen/kettle/set", 1, false, `{"state": "OFF"}`)
+			if token := k.client.Publish(fmt.Sprintf("zigbee2mqtt/%s/set", k.Info.FriendlyName), 1, false, `{"state": "OFF"}`); token.Wait() && token.Error() != nil {
+				log.Println(token.Error())
+			}
+
+		case <- k.stop:
+			return
 		}
-	}()
+	}
+}
 
-	k.m.AddHandler(fmt.Sprintf("zigbee2mqtt/%s", k.Info.FriendlyName), func (_ paho.Client, msg paho.Message)  {
-		var payload struct {
-			State string `json:"state"`
-		}
-		json.Unmarshal(msg.Payload(), &payload)
+func (k *kettle) Delete() {
+	// The the timer function that it needs to stop
+	k.stop <- struct{}{}
+}
 
-		// Update the internal state
-		k.isOn = payload.State == "ON"
-		k.online = true
+func NewKettle(info DeviceInfo, client paho.Client, s *google.Service) *kettle {
+	k := &kettle{Info: info, client: client, updated: make(chan bool, 1), timerLength: 5 * time.Minute, stop: make(chan interface{})}
+	k.timer = time.NewTimer(k.timerLength)
+	k.timer.Stop()
 
-		// Notify that the state has updated
-		for len(k.updated) > 0 {
-			<- k.updated
-		}
-		k.updated <- true
+	// Start function 
+	go k.timerFunc()
 
-		// Notify google of the updated state
-		id := k.GetID()
-		s.ReportState(context.Background(), id, map[string]google.DeviceState{
-			id: k.getState(),
-		})
-
-		if k.isOn {
-			timer.Reset(length)
-		} else {
-			timer.Stop()
-		}
-	})
+	if token := k.client.Subscribe(fmt.Sprintf("zigbee2mqtt/%s", k.Info.FriendlyName), 1, k.stateHandler); token.Wait() && token.Error() != nil {
+		log.Println(token.Error())
+	}
 
 	return k
 }
@@ -94,6 +114,8 @@ func (k *kettle) Sync() *google.Device {
 		Name: name,
 	}
 
+	// @TODO Fix reporting
+	// device.WillReportState = true
 	device.WillReportState = true
 	if len(name) > 1 {
 		device.RoomHint = room
@@ -104,8 +126,6 @@ func (k *kettle) Sync() *google.Device {
 		Model: k.Info.ModelID,
 		SwVersion: k.Info.SoftwareBuildID,
 	}
-
-	k.m.Publish(fmt.Sprintf("zigbee2mqtt/%s/get", k.Info.FriendlyName), 1, false, `{ "state": "" }`)
 
 	return device
 }
@@ -128,17 +148,13 @@ func (k *kettle) Execute(execution google.Execution, updatedState *google.Device
 
 	switch execution.Name {
 	case google.CommandOnOff:
-		state := "OFF"
-		if execution.OnOff.On {
-			state = "ON"
-		}
 
 		// Clear the updated channel
 		for len(k.updated) > 0 {
 			<- k.updated
 		}
-		// Update the state
-		k.m.Publish(fmt.Sprintf("zigbee2mqtt/%s/set", k.Info.FriendlyName), 1, false, fmt.Sprintf(`{ "state": "%s" }`, state))
+
+		k.SetState(execution.OnOff.On)
 
 		// Start timeout timer
 		timer := time.NewTimer(time.Second)
@@ -167,6 +183,13 @@ func (k *kettle) GetID() string {
 	return k.Info.IEEEAdress
 }
 
-func (k *kettle) TurnOff() {
-	k.m.Publish(fmt.Sprintf("zigbee2mqtt/%s/set", k.Info.FriendlyName), 1, false, fmt.Sprintf(`{ "state": "OFF" }`))
+func (k *kettle) SetState(state bool) {
+	msg := "OFF"
+	if state {
+		msg = "ON"
+	}
+
+	if token := k.client.Publish(fmt.Sprintf("zigbee2mqtt/%s/set", k.Info.FriendlyName), 1, false, fmt.Sprintf(`{ "state": "%s" }`, msg)); token.Wait() && token.Error() != nil {
+		log.Println(token.Error())
+	}
 }

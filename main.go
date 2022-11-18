@@ -1,14 +1,13 @@
 package main
 
 import (
+	"automation/connect"
 	"automation/device"
 	"automation/integration/hue"
 	"automation/integration/kasa"
 	"automation/integration/mqtt"
 	"automation/integration/ntfy"
 	"automation/presence"
-	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -17,8 +16,6 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v3"
-
-	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
 type config struct {
@@ -128,23 +125,25 @@ func main() {
 
 	devices = make(map[string]interface{})
 
+	var connect connect.Connect
+
 	// MQTT
-	m := mqtt.Connect(config.MQTT)
-	defer m.Disconnect()
+	connect.Client = mqtt.New(config.MQTT)
+	defer connect.Client.Disconnect(250)
+
+	// ntfy.sh
+	connect.Notify = ntfy.New(config.NTFY)
 
 	// Hue
-	h := hue.Connect(config.Hue)
+	connect.Hue = hue.Connect(config.Hue)
 
 	// Kasa
 	for name, ip := range config.Kasa.Outlets {
 		devices[name] = kasa.New(ip)
 	}
 
-	// ntfy.sh
-	// n := ntfy.Connect(config.NTFY)
-
 	// Devices that we control and expose to google home
-	provider := device.NewProvider(config.Google, &m)
+	provider := device.NewProvider(config.Google, connect.Client)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/assistant", provider.Service.FullfillmentHandler)
@@ -154,47 +153,8 @@ func main() {
 	}
 
 	// Presence
-	p := presence.New()
-	m.AddHandler("automation/presence/+", p.PresenceHandler)
-
-	m.AddHandler("automation/presence", func(client paho.Client, msg paho.Message) {
-		if len(msg.Payload()) == 0 {
-			// In this case we clear the persistent message
-			return
-		}
-		var message presence.Message
-		err := json.Unmarshal(msg.Payload(), &message)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		fmt.Printf("Presence: %t\n", message.State)
-		// Notify users of presence update
-		// n.Presence(present)
-
-		// Set presence on the hue bridge
-		h.SetFlag(41, message.State)
-
-		if !message.State {
-			// Turn off all the devices that we manage ourselves
-			provider.TurnAllOff()
-
-			// Turn off all devices
-			// @TODO Maybe allow for exceptions, could be a list in the config that we check against?
-			for _, device := range devices {
-				switch d := device.(type) {
-				case kasa.Kasa:
-					d.SetState(false)
-
-				}
-			}
-
-			// @TODO Turn off nest thermostat
-		} else {
-			// @TODO Turn on the nest thermostat again
-		}
-	})
+	p := presence.New(&connect)
+	defer p.Delete()
 
 	addr := ":8090"
 	srv := http.Server{
