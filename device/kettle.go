@@ -12,7 +12,7 @@ import (
 )
 
 type kettle struct {
-	Info DeviceInfo
+	info DeviceInfo
 	client paho.Client
 	updated chan bool
 
@@ -63,7 +63,7 @@ func (k *kettle) timerFunc() {
 		select {
 		case <- k.timer.C:
 			log.Println("Turning kettle automatically off")
-			if token := k.client.Publish(fmt.Sprintf("zigbee2mqtt/%s/set", k.Info.FriendlyName), 1, false, `{"state": "OFF"}`); token.Wait() && token.Error() != nil {
+			if token := k.client.Publish(fmt.Sprintf("zigbee2mqtt/%s/set", k.info.FriendlyName), 1, false, `{"state": "OFF"}`); token.Wait() && token.Error() != nil {
 				log.Println(token.Error())
 			}
 
@@ -79,14 +79,14 @@ func (k *kettle) Delete() {
 }
 
 func NewKettle(info DeviceInfo, client paho.Client, s *google.Service) *kettle {
-	k := &kettle{Info: info, client: client, updated: make(chan bool, 1), timerLength: 5 * time.Minute, stop: make(chan interface{})}
+	k := &kettle{info: info, client: client, updated: make(chan bool, 1), timerLength: 5 * time.Minute, stop: make(chan interface{})}
 	k.timer = time.NewTimer(k.timerLength)
 	k.timer.Stop()
 
 	// Start function 
 	go k.timerFunc()
 
-	if token := k.client.Subscribe(fmt.Sprintf("zigbee2mqtt/%s", k.Info.FriendlyName), 1, k.stateHandler); token.Wait() && token.Error() != nil {
+	if token := k.client.Subscribe(fmt.Sprintf("zigbee2mqtt/%s", k.info.FriendlyName), 1, k.stateHandler); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 
@@ -97,7 +97,7 @@ func (k *kettle) Sync() *google.Device {
 	device := google.NewDevice(k.GetID(), google.TypeKettle)
 	device.AddOnOffTrait(false, false)
 
-	s := strings.Split(k.Info.FriendlyName, "/")
+	s := strings.Split(k.info.FriendlyName, "/")
 	room := ""
 	name := s[0]
 	if len(s) > 1 {
@@ -122,9 +122,9 @@ func (k *kettle) Sync() *google.Device {
 	}
 
 	device.DeviceInfo = google.DeviceInfo{
-		Manufacturer: k.Info.Manufacturer,
-		Model: k.Info.ModelID,
-		SwVersion: k.Info.SoftwareBuildID,
+		Manufacturer: k.info.Manufacturer,
+		Model: k.info.ModelID,
+		SwVersion: k.info.SoftwareBuildID,
 	}
 
 	return device
@@ -180,7 +180,15 @@ func (k *kettle) Execute(execution google.Execution, updatedState *google.Device
 }
 
 func (k *kettle) GetID() string {
-	return k.Info.IEEEAdress
+	return k.info.IEEEAdress
+}
+
+func (k *kettle) GetName() string {
+	return k.info.FriendlyName
+}
+
+func (k *kettle) GetDeviceInfo() DeviceInfo {
+	return k.info
 }
 
 func (k *kettle) SetState(state bool) {
@@ -189,7 +197,8 @@ func (k *kettle) SetState(state bool) {
 		msg = "ON"
 	}
 
-	if token := k.client.Publish(fmt.Sprintf("zigbee2mqtt/%s/set", k.Info.FriendlyName), 1, false, fmt.Sprintf(`{ "state": "%s" }`, msg)); token.Wait() && token.Error() != nil {
+	if token := k.client.Publish(fmt.Sprintf("zigbee2mqtt/%s/set", k.info.FriendlyName), 1, false, fmt.Sprintf(`{ "state": "%s" }`, msg)); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 }
+

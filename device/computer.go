@@ -59,6 +59,10 @@ func (c *computer) GetID() string {
 	return c.macAddress
 }
 
+func (c *computer) GetName() string {
+	return c.name
+}
+
 func (c *computer) SetState(state bool) {
 	if state {
 		http.Get(c.url)

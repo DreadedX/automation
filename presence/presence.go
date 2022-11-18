@@ -1,7 +1,9 @@
 package presence
 
 import (
+	"automation/device"
 	"automation/integration/hue"
+	"automation/integration/kasa"
 	"automation/integration/ntfy"
 	"encoding/json"
 	"fmt"
@@ -17,6 +19,7 @@ type Presence struct {
 	client paho.Client
 	hue *hue.Hue
 	ntfy *ntfy.Notify
+	provider *device.Provider
 
 	devices  map[string]bool
 	presence  bool
@@ -94,18 +97,18 @@ func (p *Presence) overallPresenceHandler(client paho.Client, msg paho.Message) 
 
 	if !message.State {
 		log.Println("Turn off all the devices")
-		// // Turn off all the devices that we manage ourselves
-		// provider.TurnAllOff()
 
-		// // Turn off all devices
-		// // @TODO Maybe allow for exceptions, could be a list in the config that we check against?
-		// for _, device := range devices {
-		// 	switch d := device.(type) {
-		// 	case kasa.Kasa:
-		// 		d.SetState(false)
+		// Turn off all devices
+		// @TODO Maybe allow for exceptions, could be a list in the config that we check against?
+		for _, dev := range p.provider.Devices.Devices {
+			switch d := dev.(type) {
+			case *kasa.Kasa:
+				d.SetState(false)
+			case device.ZigbeeDevice:
+				d.SetState(false)
+			}
 
-		// 	}
-		// }
+		}
 
 		// @TODO Turn off nest thermostat
 	} else {
@@ -113,8 +116,8 @@ func (p *Presence) overallPresenceHandler(client paho.Client, msg paho.Message) 
 	}
 }
 
-func New(client paho.Client, hue *hue.Hue, ntfy *ntfy.Notify) *Presence {
-	p := &Presence{client: client, hue: hue, ntfy: ntfy, devices: make(map[string]bool), presence: false}
+func New(client paho.Client, hue *hue.Hue, ntfy *ntfy.Notify, provider *device.Provider) *Presence {
+	p := &Presence{client: client, hue: hue, ntfy: ntfy, provider: provider, devices: make(map[string]bool), presence: false}
 
 	if token := p.client.Subscribe("automation/presence", 1, p.overallPresenceHandler); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())

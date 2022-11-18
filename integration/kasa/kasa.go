@@ -47,11 +47,12 @@ func decrypt(data []byte) ([]byte, error) {
 
 
 type Kasa struct {
+	name string
 	ip string
 }
 
-func New(ip string) Kasa {
-	return Kasa{ip}
+func New(name string, ip string) *Kasa {
+	return &Kasa{name, ip}
 }
 
 func (kasa *Kasa) sendCmd(cmd cmd) (reply, error) {
@@ -128,5 +129,9 @@ func (kasa *Kasa) GetState() bool {
 	}
 
 	return reply.System.GetSysinfo.RelayState == 1
+}
+
+func (kasa *Kasa) GetName() string {
+	return kasa.name
 }
 
