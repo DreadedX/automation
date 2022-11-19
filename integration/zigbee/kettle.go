@@ -1,19 +1,23 @@
-package device
+package zigbee
 
 import (
+	"automation/device"
 	"automation/integration/google"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
 type kettle struct {
-	info DeviceInfo
+	info Info
+
 	client paho.Client
+	service *google.Service
+
 	updated chan bool
 
 	timerLength time.Duration
@@ -24,8 +28,19 @@ type kettle struct {
 	online bool
 }
 
-func (k *kettle) getState() google.DeviceState {
-	return google.NewDeviceState(k.online).RecordOnOff(k.isOn)
+func NewKettle(info Info, client paho.Client, service *google.Service) *kettle {
+	k := &kettle{info: info, client: client, service: service, updated: make(chan bool, 1), timerLength: 5 * time.Minute, stop: make(chan interface{})}
+	k.timer = time.NewTimer(k.timerLength)
+	k.timer.Stop()
+
+	// Start function 
+	go k.timerFunc()
+
+	if token := k.client.Subscribe(fmt.Sprintf("zigbee2mqtt/%s", k.info.FriendlyName), 1, k.stateHandler); token.Wait() && token.Error() != nil {
+		log.Println(token.Error())
+	}
+
+	return k
 }
 
 func (k *kettle) stateHandler(client paho.Client, msg paho.Message) {
@@ -45,11 +60,10 @@ func (k *kettle) stateHandler(client paho.Client, msg paho.Message) {
 	k.updated <- true
 
 	// Notify google of the updated state
-	// @TODO Fix this
-	// id := k.GetID()
-	// s.ReportState(context.Background(), id, map[string]google.DeviceState{
-	// 	id: k.getState(),
-	// })
+	id := k.GetID().String()
+	k.service.ReportState(context.Background(), id, map[string]google.DeviceState{
+		id: k.getState(),
+	})
 
 	if k.isOn {
 		k.timer.Reset(k.timerLength)
@@ -73,51 +87,42 @@ func (k *kettle) timerFunc() {
 	}
 }
 
-func (k *kettle) Delete() {
-	// The the timer function that it needs to stop
-	k.stop <- struct{}{}
+func (k *kettle) getState() google.DeviceState {
+	return google.NewDeviceState(k.online).RecordOnOff(k.isOn)
 }
 
-func NewKettle(info DeviceInfo, client paho.Client, s *google.Service) *kettle {
-	k := &kettle{info: info, client: client, updated: make(chan bool, 1), timerLength: 5 * time.Minute, stop: make(chan interface{})}
-	k.timer = time.NewTimer(k.timerLength)
-	k.timer.Stop()
 
-	// Start function 
-	go k.timerFunc()
+// zigbee.Device
+var _ Device = (*kettle)(nil)
+func (k *kettle) Delete() {
+	k.stop <- struct{}{}
 
 	if token := k.client.Subscribe(fmt.Sprintf("zigbee2mqtt/%s", k.info.FriendlyName), 1, k.stateHandler); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
-
-	return k
 }
 
-func (k *kettle) Sync() *google.Device {
-	device := google.NewDevice(k.GetID(), google.TypeKettle)
-	device.AddOnOffTrait(false, false)
+func (k *kettle) IsZigbeeDevice() bool {
+	return true
+}
 
-	s := strings.Split(k.info.FriendlyName, "/")
-	room := ""
-	name := s[0]
-	if len(s) > 1 {
-		room = s[0]
-		name = s[1]
-	}
-	room = strings.Title(room)
-	name = strings.Title(name)
+
+// google.DeviceInterface
+var _ google.DeviceInterface = (*kettle)(nil)
+func (k *kettle) Sync() *google.Device {
+	device := google.NewDevice(k.GetID().String(), google.TypeKettle)
+	device.AddOnOffTrait(false, false)
 
 	device.Name = google.DeviceName{
 		DefaultNames: []string{
 			"Kettle",
 		},
-		Name: name,
+		Name: k.GetID().Name(),
 	}
 
-	// @TODO Fix reporting
-	// device.WillReportState = true
 	device.WillReportState = true
-	if len(name) > 1 {
+	room := k.GetID().Room()
+	if len(room) > 1 {
 		device.RoomHint = room
 	}
 
@@ -130,10 +135,9 @@ func (k *kettle) Sync() *google.Device {
 	return device
 }
 
+// google.DeviceInterface
 func (k *kettle) Query() google.DeviceState {
-	// We just report out internal representation as it should always match the actual state
 	state := k.getState()
-	// No /get needed
 	if k.online {
 		state.Status = google.StatusSuccess
 	} else {
@@ -143,6 +147,7 @@ func (k *kettle) Query() google.DeviceState {
 	return state
 }
 
+// google.DeviceInterface
 func (k *kettle) Execute(execution google.Execution, updatedState *google.DeviceState) (string, bool) {
 	errCode := ""
 
@@ -154,7 +159,7 @@ func (k *kettle) Execute(execution google.Execution, updatedState *google.Device
 			<- k.updated
 		}
 
-		k.SetState(execution.OnOff.On)
+		k.SetOnOff(execution.OnOff.On)
 
 		// Start timeout timer
 		timer := time.NewTimer(time.Second)
@@ -179,19 +184,15 @@ func (k *kettle) Execute(execution google.Execution, updatedState *google.Device
 	return errCode, k.online
 }
 
-func (k *kettle) GetID() string {
-	return k.info.IEEEAdress
-}
-
-func (k *kettle) GetName() string {
+// device.Base
+var _ device.Basic = (*kettle)(nil)
+func (k *kettle) GetID() device.InternalName {
 	return k.info.FriendlyName
 }
 
-func (k *kettle) GetDeviceInfo() DeviceInfo {
-	return k.info
-}
-
-func (k *kettle) SetState(state bool) {
+// device.OnOff
+var _ device.OnOff = (*kettle)(nil)
+func (k *kettle) SetOnOff(state bool) {
 	msg := "OFF"
 	if state {
 		msg = "ON"
@@ -202,3 +203,7 @@ func (k *kettle) SetState(state bool) {
 	}
 }
 
+// device.OnOff
+func (k *kettle) GetOnOff() bool {
+	return k.isOn
+}

@@ -1,12 +1,10 @@
 package presence
 
 import (
-	"automation/device"
+	"automation/home"
 	"automation/integration/hue"
-	"automation/integration/kasa"
 	"automation/integration/ntfy"
 	"encoding/json"
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -16,11 +14,6 @@ import (
 )
 
 type Presence struct {
-	client paho.Client
-	hue *hue.Hue
-	ntfy *ntfy.Notify
-	provider *device.Provider
-
 	devices  map[string]bool
 	presence  bool
 }
@@ -47,7 +40,7 @@ func (p *Presence) devicePresenceHandler(client paho.Client, msg paho.Message) {
 	}
 
 	present := false
-	pretty.Println(p.devices)
+	pretty.Logf("Presence updated: %v\n", p.devices)
 	for _, value := range p.devices {
 		if value {
 			present = true
@@ -55,7 +48,7 @@ func (p *Presence) devicePresenceHandler(client paho.Client, msg paho.Message) {
 		}
 	}
 
-	log.Println(present)
+	log.Printf("Setting overall presence: %t\n", present)
 
 	if p.presence != present {
 		p.presence = present
@@ -76,66 +69,18 @@ func (p *Presence) devicePresenceHandler(client paho.Client, msg paho.Message) {
 	}
 }
 
-func (p *Presence) overallPresenceHandler(client paho.Client, msg paho.Message) {
-	if len(msg.Payload()) == 0 {
-		// In this case we clear the persistent message
-		return
-	}
-	var message Message
-	err := json.Unmarshal(msg.Payload(), &message)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+func New(client paho.Client, hue *hue.Hue, ntfy *ntfy.Notify, home *home.Home) *Presence {
+	p := &Presence{devices: make(map[string]bool), presence: false}
 
-	fmt.Printf("Presence: %t\n", message.State)
-	// Notify users of presence update
-	p.ntfy.Presence(p.presence)
-
-	// Set presence on the hue bridge
-	p.hue.SetFlag(41, message.State)
-
-	if !message.State {
-		log.Println("Turn off all the devices")
-
-		// Turn off all devices
-		// @TODO Maybe allow for exceptions, could be a list in the config that we check against?
-		for _, dev := range p.provider.Devices.Devices {
-			switch d := dev.(type) {
-			case *kasa.Kasa:
-				d.SetState(false)
-			case device.ZigbeeDevice:
-				d.SetState(false)
-			}
-
-		}
-
-		// @TODO Turn off nest thermostat
-	} else {
-		// @TODO Turn on the nest thermostat again
-	}
-}
-
-func New(client paho.Client, hue *hue.Hue, ntfy *ntfy.Notify, provider *device.Provider) *Presence {
-	p := &Presence{client: client, hue: hue, ntfy: ntfy, provider: provider, devices: make(map[string]bool), presence: false}
-
-	if token := p.client.Subscribe("automation/presence", 1, p.overallPresenceHandler); token.Wait() && token.Error() != nil {
-		log.Println(token.Error())
-	}
-
-	if token := p.client.Subscribe("automation/presence/+", 1, p.devicePresenceHandler); token.Wait() && token.Error() != nil {
+	if token := client.Subscribe("automation/presence/+", 1, p.devicePresenceHandler); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 
 	return p
 }
 
-func (p *Presence) Delete() {
-	if token := p.client.Unsubscribe("automation/presence"); token.Wait() && token.Error() != nil {
-		log.Println(token.Error())
-	}
-
-	if token := p.client.Unsubscribe("automation/presence/+"); token.Wait() && token.Error() != nil {
+func (p *Presence) Delete(client paho.Client) {
+	if token := client.Unsubscribe("automation/presence/+"); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 }

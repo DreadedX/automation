@@ -5,12 +5,15 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 )
 
 // This implementation is based on:
 // https://www.softscheck.com/en/blog/tp-link-reverse-engineering/
+
+type Device interface {
+	GetIP() string
+}
 
 func encrypt(data []byte) []byte {
 	var key byte = 171
@@ -45,18 +48,8 @@ func decrypt(data []byte) ([]byte, error) {
 	return buf, nil
 }
 
-
-type Kasa struct {
-	name string
-	ip string
-}
-
-func New(name string, ip string) *Kasa {
-	return &Kasa{name, ip}
-}
-
-func (kasa *Kasa) sendCmd(cmd cmd) (reply, error) {
-	con, err := net.Dial("tcp", fmt.Sprintf("%s:9999", kasa.ip))
+func sendCmd(kasa Device, cmd cmd) (reply, error) {
+	con, err := net.Dial("tcp", fmt.Sprintf("%s:9999", kasa.GetIP()))
 	if err != nil {
 		return reply{}, err
 	}
@@ -91,47 +84,5 @@ func (kasa *Kasa) sendCmd(cmd cmd) (reply, error) {
 	}
 
 	return reply, err
-}
-
-func (kasa *Kasa) SetState(on bool) {
-	var cmd cmd
-	cmd.System.SetRelayState = &SetRelayState{State: 0}
-	if on {
-		cmd.System.SetRelayState.State = 1
-	}
-
-	reply, err := kasa.sendCmd(cmd)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	if reply.System.SetRelayState.ErrCode != 0 {
-		log.Printf("Failed to set relay state, error: %d\n", reply.System.SetRelayState.ErrCode)
-	}
-}
-
-func (kasa *Kasa) GetState() bool {
-	cmd := cmd{}
-
-	cmd.System.GetSysinfo = &GetSysinfo{}
-	
-	reply, err := kasa.sendCmd(cmd)
-	if err != nil {
-		log.Println(err)
-		return false
-	}
-
-	if reply.System.GetSysinfo.ErrCode != 0 {
-		log.Printf("Failed to set relay state, error: %d\n", reply.System.GetSysinfo.ErrCode)
-
-		return false
-	}
-
-	return reply.System.GetSysinfo.RelayState == 1
-}
-
-func (kasa *Kasa) GetName() string {
-	return kasa.name
 }
 

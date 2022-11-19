@@ -11,7 +11,6 @@ type Notify struct {
 }
 
 func (n *Notify) Presence(home bool) {
-	// @TODO Maybe add list the devices that are home currently?
 	var description string
 	var actions string
 	if home {

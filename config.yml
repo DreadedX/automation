@@ -13,7 +13,10 @@ kasa:
     living_room/speakers: 10.0.0.182
 
 computers:
-  zeus:
+  living_room/zeus:
     mac: 30:9c:23:60:9c:13
     room: Living Room
     url: http://10.0.0.2:9000/start-pc?mac=30:9c:23:60:9c:13
+
+google:
+  username: Dreaded_X

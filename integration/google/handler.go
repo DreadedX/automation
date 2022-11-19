@@ -1,6 +1,7 @@
 package google
 
 import (
+	"automation/device"
 	"encoding/json"
 	"io"
 	"log"
@@ -10,10 +11,11 @@ import (
 )
 
 type DeviceInterface interface {
+	device.Basic
+
 	Sync() *Device
 	Query() DeviceState
 	Execute(execution Execution, updatedState *DeviceState) (errCode string, online bool)
-	GetID() string
 }
 
 // https://developers.google.com/assistant/smarthome/reference/intent/sync
