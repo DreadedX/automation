@@ -1,5 +1,5 @@
 .git/
 storage/
-automation
+app
 .env
 tmp/

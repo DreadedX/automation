@@ -35,6 +35,9 @@ func (c *computer) GetID() device.InternalName {
 
 // google.DeviceInterface
 var _ google.DeviceInterface = (*computer)(nil)
+func (*computer) IsGoogleDevice() {}
+
+// google.DeviceInterface
 func (c *computer) Sync() *google.Device {
 	device := google.NewDevice(c.GetID().String(), google.TypeScene)
 	device.AddSceneTrait(false)

@@ -9,8 +9,6 @@ import (
 
 	"google.golang.org/api/homegraph/v1"
 	"google.golang.org/api/option"
-
-	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
 type Home struct {
@@ -21,7 +19,7 @@ type Home struct {
 }
 
 // Auto populate and update the device list
-func New(username string, credentials config.Credentials, client paho.Client) *Home {
+func New(username string, credentials config.Credentials) *Home {
 	home := &Home{Username: username, Devices: make(map[device.InternalName]device.Basic)}
 
 	homegraphService, err := homegraph.NewService(context.Background(), option.WithCredentialsJSON(credentials))

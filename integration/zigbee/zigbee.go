@@ -14,7 +14,6 @@ type Info struct {
 type Device interface {
 	device.Basic
 
-	// This function only exists to make this interface unique
-	IsZigbeeDevice() bool
+	IsZigbeeDevice()
 	Delete()
 }

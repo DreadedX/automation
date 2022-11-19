@@ -13,6 +13,7 @@ import (
 type DeviceInterface interface {
 	device.Basic
 
+	IsGoogleDevice()
 	Sync() *Device
 	Query() DeviceState
 	Execute(execution Execution, updatedState *DeviceState) (errCode string, online bool)

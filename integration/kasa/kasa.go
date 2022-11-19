@@ -1,6 +1,7 @@
 package kasa
 
 import (
+	"automation/device"
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
@@ -12,6 +13,9 @@ import (
 // https://www.softscheck.com/en/blog/tp-link-reverse-engineering/
 
 type Device interface {
+	device.Basic
+
+	IsKasaDevice()
 	GetIP() string
 }
 

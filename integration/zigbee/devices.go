@@ -30,6 +30,8 @@ func DevicesHandler(client paho.Client, home *home.Home) {
 		}
 
 		// Send sync request
+		// @TODO Instead of sending a sync request we should do something like home.sync <- interface{}
+		// This will then restart a timer, that way the sync will only trigger once everything has settled from multiple locations
 		home.Service.RequestSync(context.Background(), home.Username)
 	}
 

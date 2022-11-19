@@ -3,7 +3,6 @@ package automation
 import (
 	"automation/device"
 	"automation/home"
-	"automation/integration/kasa"
 	"encoding/json"
 	"log"
 
@@ -12,12 +11,12 @@ import (
 
 func mixerAutomation(client paho.Client, home *home.Home) {
 	var handler paho.MessageHandler = func(client paho.Client, msg paho.Message) {
-		mixer, err := device.GetDevice[*kasa.Outlet](&home.Devices, "living_room/mixer")
+		mixer, err := device.GetDevice[device.OnOff](&home.Devices, "living_room/mixer")
 		if err != nil {
 			log.Println(err)
 			return
 		}
-		speakers, err := device.GetDevice[*kasa.Outlet](&home.Devices, "living_room/speakers")
+		speakers, err := device.GetDevice[device.OnOff](&home.Devices, "living_room/speakers")
 		if err != nil {
 			log.Println(err)
 			return

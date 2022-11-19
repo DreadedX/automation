@@ -20,21 +20,12 @@ type kettle struct {
 
 	updated chan bool
 
-	timerLength time.Duration
-	timer *time.Timer
-	stop chan interface{}
-
 	isOn bool
 	online bool
 }
 
 func NewKettle(info Info, client paho.Client, service *google.Service) *kettle {
-	k := &kettle{info: info, client: client, service: service, updated: make(chan bool, 1), timerLength: 5 * time.Minute, stop: make(chan interface{})}
-	k.timer = time.NewTimer(k.timerLength)
-	k.timer.Stop()
-
-	// Start function 
-	go k.timerFunc()
+	k := &kettle{info: info, client: client, service: service, updated: make(chan bool, 1)}
 
 	if token := k.client.Subscribe(fmt.Sprintf("zigbee2mqtt/%s", k.info.FriendlyName), 1, k.stateHandler); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
@@ -64,27 +55,6 @@ func (k *kettle) stateHandler(client paho.Client, msg paho.Message) {
 	k.service.ReportState(context.Background(), id, map[string]google.DeviceState{
 		id: k.getState(),
 	})
-
-	if k.isOn {
-		k.timer.Reset(k.timerLength)
-	} else {
-		k.timer.Stop()
-	}
-}
-
-func (k *kettle) timerFunc() {
-	for {
-		select {
-		case <- k.timer.C:
-			log.Println("Turning kettle automatically off")
-			if token := k.client.Publish(fmt.Sprintf("zigbee2mqtt/%s/set", k.info.FriendlyName), 1, false, `{"state": "OFF"}`); token.Wait() && token.Error() != nil {
-				log.Println(token.Error())
-			}
-
-		case <- k.stop:
-			return
-		}
-	}
 }
 
 func (k *kettle) getState() google.DeviceState {
@@ -94,21 +64,20 @@ func (k *kettle) getState() google.DeviceState {
 
 // zigbee.Device
 var _ Device = (*kettle)(nil)
-func (k *kettle) Delete() {
-	k.stop <- struct{}{}
+func (k *kettle) IsZigbeeDevice() {}
 
-	if token := k.client.Subscribe(fmt.Sprintf("zigbee2mqtt/%s", k.info.FriendlyName), 1, k.stateHandler); token.Wait() && token.Error() != nil {
+// zigbee.Device
+func (k *kettle) Delete() {
+	if token := k.client.Unsubscribe(fmt.Sprintf("zigbee2mqtt/%s", k.info.FriendlyName)); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 }
 
-func (k *kettle) IsZigbeeDevice() bool {
-	return true
-}
-
-
 // google.DeviceInterface
 var _ google.DeviceInterface = (*kettle)(nil)
+func (*kettle) IsGoogleDevice() {}
+
+// google.DeviceInterface
 func (k *kettle) Sync() *google.Device {
 	device := google.NewDevice(k.GetID().String(), google.TypeKettle)
 	device.AddOnOffTrait(false, false)

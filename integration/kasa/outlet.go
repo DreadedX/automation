@@ -17,6 +17,9 @@ func NewOutlet(name device.InternalName, ip string) *Outlet {
 
 // kasa.Device
 var _ Device = (*Outlet)(nil)
+func (*Outlet) IsKasaDevice() {}
+
+// kasa.Device
 func (o *Outlet) GetIP() string {
 	return o.ip
 }

@@ -11,4 +11,5 @@ import (
 func RegisterAutomations(client paho.Client, hue *hue.Hue, notify *ntfy.Notify, home *home.Home) {
 	presenceAutomation(client, hue, notify, home)
 	mixerAutomation(client, home)
+	kettleAutomation(client, home)
 }
