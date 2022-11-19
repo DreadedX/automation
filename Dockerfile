@@ -7,13 +7,13 @@ RUN go mod download
 
 COPY . .
 
-RUN go build
+RUN go build -o app
 
 
 FROM golang:alpine
 
 WORKDIR /app
-COPY --from=build-automation /src/automation /app/automation
+COPY --from=build-automation /src/app /app/app
 COPY --from=build-automation /src/config.yml /app/config.yml
 
-CMD ["/app/automation"]
+CMD ["/app/app"]
