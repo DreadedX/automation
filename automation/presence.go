@@ -53,7 +53,7 @@ func presenceAutomation(client paho.Client, hue *hue.Hue, notify *ntfy.Notify, h
 		notify.Presence(message.State)
 	}
 
-	if token := client.Subscribe("test/remote", 1, handler); token.Wait() && token.Error() != nil {
+	if token := client.Subscribe("automation/presence", 1, handler); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 }
