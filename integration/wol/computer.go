@@ -14,16 +14,19 @@ type computer struct {
 }
 
 func NewComputer(macAddress string, name device.InternalName, url string) *computer {
-	c := &computer{macAddress: macAddress, name: name}
+	c := &computer{macAddress, name, url}
 
 	return c
 }
 
 func (c *computer) Activate(state bool) {
 	if state {
-		http.Get(c.url)
+		_, err := http.Get(c.url)
+		if err != nil {
+			log.Println(err)
+		}
 	} else {
-		// Scene does not implement this
+		// This is not implemented
 	}
 }
 
