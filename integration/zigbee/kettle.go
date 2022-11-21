@@ -27,7 +27,7 @@ type kettle struct {
 func NewKettle(info Info, client paho.Client, service *google.Service) *kettle {
 	k := &kettle{info: info, client: client, service: service, updated: make(chan bool, 1)}
 
-	if token := k.client.Subscribe(fmt.Sprintf("zigbee2mqtt/%s", k.info.FriendlyName), 1, k.stateHandler); token.Wait() && token.Error() != nil {
+	if token := k.client.Subscribe(k.info.MQTTAddress, 1, k.stateHandler); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 
@@ -35,13 +35,11 @@ func NewKettle(info Info, client paho.Client, service *google.Service) *kettle {
 }
 
 func (k *kettle) stateHandler(client paho.Client, msg paho.Message) {
-	var payload struct {
-		State string `json:"state"`
-	}
+	var payload OnOffState
 	json.Unmarshal(msg.Payload(), &payload)
 
 	// Update the internal state
-	k.isOn = payload.State == "ON"
+	k.isOn = payload.State
 	k.online = true
 
 	// Notify that the state has updated
@@ -68,7 +66,7 @@ func (k *kettle) IsZigbeeDevice() {}
 
 // zigbee.Device
 func (k *kettle) Delete() {
-	if token := k.client.Unsubscribe(fmt.Sprintf("zigbee2mqtt/%s", k.info.FriendlyName)); token.Wait() && token.Error() != nil {
+	if token := k.client.Unsubscribe(k.info.MQTTAddress); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 }
@@ -167,7 +165,7 @@ func (k *kettle) SetOnOff(state bool) {
 		msg = "ON"
 	}
 
-	if token := k.client.Publish(fmt.Sprintf("zigbee2mqtt/%s/set", k.info.FriendlyName), 1, false, fmt.Sprintf(`{ "state": "%s" }`, msg)); token.Wait() && token.Error() != nil {
+	if token := k.client.Publish(fmt.Sprintf("%s/set", k.info.MQTTAddress), 1, false, fmt.Sprintf(`{ "state": "%s" }`, msg)); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 }

@@ -28,6 +28,10 @@ type config struct {
 		ClientID string `yaml:"client_id" envconfig:"MQTT_CLIENT_ID"`
 	} `yaml:"mqtt"`
 
+	Zigbee struct {
+		MQTTPrefix string `yaml:"prefix" envconfig:"ZIGBEE2MQTT_PREFIX"`
+	}
+
 	Kasa struct {
 		Outlets map[device.InternalName]string `yaml:"outlets"`
 	} `yaml:"kasa"`

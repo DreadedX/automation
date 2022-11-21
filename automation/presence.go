@@ -6,7 +6,6 @@ import (
 	"automation/integration/hue"
 	"automation/integration/ntfy"
 	"automation/presence"
-	"encoding/json"
 	"fmt"
 	"log"
 
@@ -14,18 +13,7 @@ import (
 )
 
 func presenceAutomation(client paho.Client, hue *hue.Hue, notify *ntfy.Notify, home *home.Home) {
-	var handler paho.MessageHandler = func(client paho.Client, msg paho.Message) {
-		if len(msg.Payload()) == 0 {
-			// In this case we clear the persistent message
-			return
-		}
-		var message presence.Message
-		err := json.Unmarshal(msg.Payload(), &message)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
+	on(client, "automation/presence", func(message presence.Message) {
 		fmt.Printf("Presence: %t\n", message.State)
 
 		// Set presence on the hue bridge
@@ -51,9 +39,5 @@ func presenceAutomation(client paho.Client, hue *hue.Hue, notify *ntfy.Notify, h
 
 		// Notify users of presence update
 		notify.Presence(message.State)
-	}
-
-	if token := client.Subscribe("automation/presence", 1, handler); token.Wait() && token.Error() != nil {
-		log.Println(token.Error())
-	}
+	})
 }

@@ -3,14 +3,14 @@ package automation
 import (
 	"automation/device"
 	"automation/home"
-	"encoding/json"
+	"automation/integration/zigbee"
 	"log"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
 func mixerAutomation(client paho.Client, home *home.Home) {
-	var handler paho.MessageHandler = func(client paho.Client, msg paho.Message) {
+	on(client, "test/remote", func(message zigbee.RemoteState) {
 		mixer, err := device.GetDevice[device.OnOff](&home.Devices, "living_room/mixer")
 		if err != nil {
 			log.Println(err)
@@ -22,23 +22,14 @@ func mixerAutomation(client paho.Client, home *home.Home) {
 			return
 		}
 
-		var message struct {
-			Action string `json:"action"`
-		}
-		err = json.Unmarshal(msg.Payload(), &message)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		if message.Action == "on" {
+		if message.Action == zigbee.ACTION_ON {
 			if mixer.GetOnOff() {
 				mixer.SetOnOff(false)
 				speakers.SetOnOff(false)
 			} else {
 				mixer.SetOnOff(true)
 			}
-		} else if message.Action == "brightness_move_up" {
+		} else if message.Action == zigbee.ACTION_BRIGHTNESS_UP {
 			if speakers.GetOnOff() {
 				speakers.SetOnOff(false)
 			} else {
@@ -46,10 +37,6 @@ func mixerAutomation(client paho.Client, home *home.Home) {
 				mixer.SetOnOff(true)
 			}
 		}
-	}
-
-	if token := client.Subscribe("test/remote", 1, handler); token.Wait() && token.Error() != nil {
-		log.Println(token.Error())
-	}
+	})
 }
 

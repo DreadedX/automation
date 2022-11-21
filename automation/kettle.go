@@ -3,6 +3,7 @@ package automation
 import (
 	"automation/device"
 	"automation/home"
+	"automation/integration/zigbee"
 	"fmt"
 	"log"
 	"time"
@@ -10,29 +11,19 @@ import (
 	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
-func kettleAutomation(client paho.Client, home *home.Home) {
+func kettleAutomation(client paho.Client, prefix string, home *home.Home) {
 	const name = "kitchen/kettle"
 	const length = 5 * time.Minute
 
 	timer := time.NewTimer(length)
 
-	var handler paho.MessageHandler = func(c paho.Client, m paho.Message) {
-		kettle, err := device.GetDevice[device.OnOff](&home.Devices, name)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		if kettle.GetOnOff() {
+	on(client, fmt.Sprintf("%s/%s", prefix, name), func(message zigbee.OnOffState) {
+		if message.State {
 			timer.Reset(length)
 		} else {
 			timer.Stop()
 		}
-	}
-
-	if token := client.Subscribe(fmt.Sprintf("zigbee2mqtt/%s", name), 1, handler); token.Wait() && token.Error() != nil {
-		log.Println(token.Error())
-	}
+	})
 
 	go func() {
 		for {

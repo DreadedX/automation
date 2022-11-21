@@ -9,6 +9,8 @@ type Info struct {
 	Manufacturer    string       `json:"manufacturer"`
 	ModelID         string       `json:"model_id"`
 	SoftwareBuildID string       `json:"software_build_id"`
+
+	MQTTAddress string `json:"-"`
 }
 
 type Device interface {

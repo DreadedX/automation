@@ -7,6 +7,9 @@ mqtt:
   username: mqtt
   client_id: automation
 
+zigbee:
+  prefix: zigbee2mqtt
+
 kasa:
   outlets:
     living_room/mixer: 10.0.0.49

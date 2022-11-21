@@ -5,12 +5,13 @@ import (
 	"automation/home"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
-func DevicesHandler(client paho.Client, home *home.Home) {
+func DevicesHandler(client paho.Client, prefix string, home *home.Home) {
 	var handler paho.MessageHandler = func(client paho.Client, msg paho.Message) {
 		var devices []Info
 		json.Unmarshal(msg.Payload(), &devices)
@@ -24,6 +25,7 @@ func DevicesHandler(client paho.Client, home *home.Home) {
 		for _, d := range devices {
 			switch d.Description {
 			case "Kettle":
+				d.MQTTAddress = fmt.Sprintf("%s/%s", prefix, d.FriendlyName.String())
 				kettle := NewKettle(d, client, home.Service)
 				home.AddDevice(kettle)
 			}
@@ -35,7 +37,7 @@ func DevicesHandler(client paho.Client, home *home.Home) {
 		home.Service.RequestSync(context.Background(), home.Username)
 	}
 
-	if token := client.Subscribe("zigbee2mqtt/bridge/devices", 1, handler); token.Wait() && token.Error() != nil {
+	if token := client.Subscribe(fmt.Sprintf("%s/bridge/devices", prefix), 1, handler); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 }
