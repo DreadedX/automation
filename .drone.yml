@@ -23,6 +23,8 @@ steps:
               from_secret: HUE_TOKEN
           NTFY_TOPIC:
               from_secret: NTFY_TOPIC
+          GOOGLE_OAUTH_URL:
+              from_secret: GOOGLE_OAUTH_URL
           GOOGLE_CREDENTIALS:
               from_secret: GOOGLE_CREDENTIALS
       commands:
@@ -30,7 +32,7 @@ steps:
 
           - docker rm automation || true
 
-          - docker create -e MQTT_PASSWORD=$MQTT_PASSWORD -e HUE_TOKEN=$HUE_TOKEN -e NTFY_TOPIC=$NTFY_TOPIC -e GOOGLE_CREDENTIALS=$GOOGLE_CREDENTIALS --network mqtt --name automation automation
+          - docker create -e MQTT_PASSWORD=$MQTT_PASSWORD -e HUE_TOKEN=$HUE_TOKEN -e NTFY_TOPIC=$NTFY_TOPIC -e GOOGLE_OAUTH_URL=$GOOGLE_OAUTH_URL -e GOOGLE_CREDENTIALS=$GOOGLE_CREDENTIALS --network mqtt --name automation automation
           - docker network connect mqtt automation
           - docker network connect web automation
           - docker start automation
