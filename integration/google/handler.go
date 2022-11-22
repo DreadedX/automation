@@ -3,6 +3,7 @@ package google
 import (
 	"automation/device"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -34,8 +35,8 @@ type syncResponse struct {
 type queryResponse struct {
 	RequestID string `json:"requestId"`
 	Payload   struct {
-		ErrorCode   string                   `json:"errorCode,omitempty"`
-		DebugString string                   `json:"debugString,omitempty"`
+		ErrorCode   string                 `json:"errorCode,omitempty"`
+		DebugString string                 `json:"debugString,omitempty"`
 		Devices     map[string]DeviceState `json:"devices"`
 	} `json:"payload"`
 }
@@ -66,7 +67,7 @@ func (s *Service) getUser(authorization string) (string, int) {
 		return cached.Value(), http.StatusOK
 	}
 
-	req, err := http.NewRequest("GET", "https://login.huizinga.dev/api/oidc/userinfo", nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/userinfo", s.oauthUrl), nil)
 	if err != nil {
 		log.Println("Failed to make request to to login server")
 		return "", http.StatusInternalServerError
@@ -219,7 +220,7 @@ func (s *Service) FullfillmentHandler(w http.ResponseWriter, r *http.Request) {
 
 		for errCode, details := range response.FailedDevices {
 			c := executeRespPayload{
-				Status: StatusError,
+				Status:    StatusError,
 				ErrorCode: errCode,
 			}
 

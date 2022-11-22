@@ -32,13 +32,16 @@ type Provider interface {
 type Service struct {
 	provider      Provider
 	deviceService *homegraph.DevicesService
-	cache         *ttlcache.Cache[string, string]
+	oauthUrl     string
+
+	cache *ttlcache.Cache[string, string]
 }
 
-func NewService(provider Provider, service *homegraph.Service) *Service {
+func NewService(provider Provider, service *homegraph.Service, oauthUrl string) *Service {
 	s := Service{
 		provider:      provider,
 		deviceService: homegraph.NewDevicesService(service),
+		oauthUrl:     oauthUrl,
 		cache: ttlcache.New(
 			ttlcache.WithTTL[string, string](30 * time.Minute),
 		),

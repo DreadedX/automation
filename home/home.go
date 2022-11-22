@@ -19,7 +19,7 @@ type Home struct {
 }
 
 // Auto populate and update the device list
-func New(username string, credentials config.Credentials) *Home {
+func New(username string, credentials config.Credentials, oauthUrl string) *Home {
 	home := &Home{Username: username, Devices: make(map[device.InternalName]device.Basic)}
 
 	homegraphService, err := homegraph.NewService(context.Background(), option.WithCredentialsJSON(credentials))
@@ -27,7 +27,7 @@ func New(username string, credentials config.Credentials) *Home {
 		panic(err)
 	}
 
-	home.Service = google.NewService(home, homegraphService)
+	home.Service = google.NewService(home, homegraphService, oauthUrl)
 
 	return home
 }

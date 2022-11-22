@@ -43,6 +43,7 @@ type config struct {
 
 	Google struct {
 		Username string `yaml:"username" envconfig:"GOOGLE_USERNAME"`
+		OAuthUrl string `yaml:"oauth_url" envconfig:"GOOGLE_OAUTH_URL"`
 		Credentials Credentials `yaml:"credentials" envconfig:"GOOGLE_CREDENTIALS"`
 	} `yaml:"google"`
 }

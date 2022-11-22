@@ -29,7 +29,7 @@ func main() {
 	notify := ntfy.New(cfg.Ntfy.Topic)
 	hue := hue.New(cfg.Hue.IP, cfg.Hue.Token)
 
-	home := home.New(cfg.Google.Username, cfg.Google.Credentials)
+	home := home.New(cfg.Google.Username, cfg.Google.Credentials, cfg.Google.OAuthUrl)
 	r := mux.NewRouter()
 	r.HandleFunc("/assistant", home.Service.FullfillmentHandler)
 
