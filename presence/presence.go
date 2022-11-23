@@ -53,16 +53,15 @@ func (p *Presence) devicePresenceHandler(client paho.Client, msg paho.Message) {
 	if p.presence != present {
 		p.presence = present
 
-		msg, err := json.Marshal(Message{
+		payload, err := json.Marshal(Message{
 			State:   present,
 			Updated: time.Now().UnixMilli(),
 		})
-
 		if err != nil {
 			log.Println(err)
 		}
 
-		token := client.Publish("automation/presence", 1, true, msg)
+		token := client.Publish("automation/presence", 1, true, payload)
 		if token.Wait() && token.Error() != nil {
 			log.Println(token.Error())
 		}

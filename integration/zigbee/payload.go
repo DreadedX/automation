@@ -32,3 +32,7 @@ const (
 type RemoteState struct {
 	Action RemoteAction `json:"action"`
 }
+
+type LightSensorState struct {
+	Illuminance int `json:"illuminance"`
+}

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
@@ -36,7 +37,10 @@ func NewKettle(info Info, client paho.Client, service *google.Service) *kettle {
 
 func (k *kettle) stateHandler(client paho.Client, msg paho.Message) {
 	var payload OnOffState
-	json.Unmarshal(msg.Payload(), &payload)
+	if err := json.Unmarshal(msg.Payload(), &payload); err != nil {
+		log.Println(err)
+		return
+	}
 
 	// Update the internal state
 	k.isOn = payload.State
@@ -65,8 +69,8 @@ var _ Device = (*kettle)(nil)
 func (k *kettle) IsZigbeeDevice() {}
 
 // zigbee.Device
-func (k *kettle) Delete() {
-	if token := k.client.Unsubscribe(k.info.MQTTAddress); token.Wait() && token.Error() != nil {
+func (k *kettle) Delete(client paho.Client) {
+	if token := client.Unsubscribe(k.info.MQTTAddress); token.Wait() && token.Error() != nil {
 		log.Println(token.Error())
 	}
 }
@@ -84,11 +88,11 @@ func (k *kettle) Sync() *google.Device {
 		DefaultNames: []string{
 			"Kettle",
 		},
-		Name: k.GetID().Name(),
+		Name: strings.Title(k.GetID().Name()),
 	}
 
 	device.WillReportState = true
-	room := k.GetID().Room()
+	room := strings.Title(k.GetID().Room())
 	if len(room) > 1 {
 		device.RoomHint = room
 	}

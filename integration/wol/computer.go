@@ -5,6 +5,7 @@ import (
 	"automation/integration/google"
 	"log"
 	"net/http"
+	"strings"
 )
 
 type computer struct {
@@ -49,9 +50,12 @@ func (c *computer) Sync() *google.Device {
 		DefaultNames: []string{
 			"Computer",
 		},
-		Name: c.GetID().Name(),
+		Name: strings.Title(c.GetID().Name()),
 	}
-	device.RoomHint = c.GetID().Room()
+	room := strings.Title(c.GetID().Room())
+	if len(room) > 1 {
+		device.RoomHint = room
+	}
 
 	return device
 }

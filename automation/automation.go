@@ -39,4 +39,5 @@ func RegisterAutomations(client paho.Client, prefix string, hue *hue.Hue, notify
 	presenceAutomation(client, hue, notify, home)
 	mixerAutomation(client, home)
 	kettleAutomation(client, prefix, home)
+	darknessAutomation(client, hue)
 }

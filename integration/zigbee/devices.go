@@ -17,17 +17,21 @@ func DevicesHandler(client paho.Client, prefix string, home *home.Home) {
 		json.Unmarshal(msg.Payload(), &devices)
 
 		for name, d := range device.GetDevices[Device](&home.Devices) {
-			d.Delete()
+			d.Delete(client)
 			// Delete all zigbee devices from the device list
 			delete(home.Devices, name)
 		}
 
 		for _, d := range devices {
+			d.MQTTAddress = fmt.Sprintf("%s/%s", prefix, d.FriendlyName.String())
+
 			switch d.Description {
 			case "Kettle":
-				d.MQTTAddress = fmt.Sprintf("%s/%s", prefix, d.FriendlyName.String())
 				kettle := NewKettle(d, client, home.Service)
 				home.AddDevice(kettle)
+			case "LightSensor":
+				lightSensor := NewLightSensor(d, client)
+				home.AddDevice(lightSensor)
 			}
 		}
 

@@ -11,7 +11,6 @@ func (n InternalName) Room() string {
 		room = s[0]
 	}
 	room = strings.ReplaceAll(room, "_", " ")
-	room = strings.Title(room)
 
 	return room
 }
@@ -22,7 +21,6 @@ func (n InternalName) Name() string {
 	if len(s) > 1 {
 		name = s[1]
 	}
-	name = strings.Title(name)
 
 	return name
 }
