@@ -35,7 +35,7 @@ func NewLightSensor(info Info, client paho.Client) *lightSensor {
 	l.minValue = 15000
 	l.maxValue = 18000
 
-	l.timeout = time.Minute
+	l.timeout = 5 * time.Minute
 	l.timer = time.NewTimer(l.timeout)
 	l.timer.Stop()
 
