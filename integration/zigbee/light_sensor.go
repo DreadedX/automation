@@ -31,9 +31,10 @@ type DarknessPayload struct {
 func NewLightSensor(info Info, client paho.Client) *lightSensor {
 	l := &lightSensor{info: info}
 
-	// First tune: 15 000 - 16 000
-	l.minValue = 15000
-	l.maxValue = 18000
+	// 1: 15 000 - 16 000 (Turns on to late)
+	// 2: 22 000 - 30 000
+	l.minValue = 22000
+	l.maxValue = 30000
 
 	l.timeout = 5 * time.Minute
 	l.timer = time.NewTimer(l.timeout)
