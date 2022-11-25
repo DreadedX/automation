@@ -32,9 +32,10 @@ func NewLightSensor(info Info, client paho.Client) *lightSensor {
 	l := &lightSensor{info: info}
 
 	// 1: 15 000 - 16 000 (Turns on to late)
-	// 2: 22 000 - 30 000
-	l.minValue = 22000
-	l.maxValue = 30000
+	// 2: 22 000 - 30 000 (About 5-10 mins late)
+	// 3: 23 000 - 30 000
+	l.minValue = 23000
+	l.maxValue = 25000
 
 	l.timeout = 5 * time.Minute
 	l.timer = time.NewTimer(l.timeout)
