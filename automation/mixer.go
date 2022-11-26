@@ -11,7 +11,7 @@ import (
 )
 
 func mixerAutomation(client paho.Client, prefix string, home *home.Home) {
-	on(client, fmt.Sprintf("%s/living/remote"), func(message zigbee.RemoteState) {
+	on(client, fmt.Sprintf("%s/living/remote", prefix), func(message zigbee.RemoteState) {
 		mixer, err := device.GetDevice[device.OnOff](&home.Devices, "living_room/mixer")
 		if err != nil {
 			log.Println(err)
