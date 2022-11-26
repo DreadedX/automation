@@ -4,13 +4,14 @@ import (
 	"automation/device"
 	"automation/home"
 	"automation/integration/zigbee"
+	"fmt"
 	"log"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
-func mixerAutomation(client paho.Client, home *home.Home) {
-	on(client, "test/remote", func(message zigbee.RemoteState) {
+func mixerAutomation(client paho.Client, prefix string, home *home.Home) {
+	on(client, fmt.Sprintf("%s/living/remote"), func(message zigbee.RemoteState) {
 		mixer, err := device.GetDevice[device.OnOff](&home.Devices, "living_room/mixer")
 		if err != nil {
 			log.Println(err)

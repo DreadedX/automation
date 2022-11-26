@@ -37,7 +37,7 @@ func on[M any](client paho.Client, topic string, onMessage func(message M)) {
 
 func RegisterAutomations(client paho.Client, prefix string, hue *hue.Hue, notify *ntfy.Notify, home *home.Home) {
 	presenceAutomation(client, hue, notify, home)
-	mixerAutomation(client, home)
+	mixerAutomation(client, prefix, home)
 	kettleAutomation(client, prefix, home)
 	darknessAutomation(client, hue)
 }
