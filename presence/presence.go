@@ -23,6 +23,10 @@ type Message struct {
 	Updated int64 `json:"updated"`
 }
 
+func (p *Presence) Current() bool {
+	return p.presence
+}
+
 func (p *Presence) devicePresenceHandler(client paho.Client, msg paho.Message) {
 	name := strings.Split(msg.Topic(), "/")[2]
 
@@ -47,8 +51,6 @@ func (p *Presence) devicePresenceHandler(client paho.Client, msg paho.Message) {
 			break
 		}
 	}
-
-	log.Printf("Setting overall presence: %t\n", present)
 
 	if p.presence != present {
 		p.presence = present

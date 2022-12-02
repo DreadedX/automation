@@ -4,6 +4,7 @@ import (
 	"automation/home"
 	"automation/integration/hue"
 	"automation/integration/ntfy"
+	"automation/presence"
 	"encoding/json"
 	"log"
 
@@ -35,9 +36,10 @@ func on[M any](client paho.Client, topic string, onMessage func(message M)) {
 	}
 }
 
-func RegisterAutomations(client paho.Client, prefix string, hue *hue.Hue, notify *ntfy.Notify, home *home.Home) {
+func RegisterAutomations(client paho.Client, prefix string, hue *hue.Hue, notify *ntfy.Notify, home *home.Home, presence *presence.Presence) {
 	presenceAutomation(client, hue, notify, home)
 	mixerAutomation(client, prefix, home)
 	kettleAutomation(client, prefix, home)
 	darknessAutomation(client, hue)
+	frontdoorAutomation(client, prefix, presence)
 }

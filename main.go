@@ -65,7 +65,7 @@ func main() {
 	}
 	defer automationClient.Disconnect(250)
 
-	automation.RegisterAutomations(automationClient, cfg.Zigbee.MQTTPrefix, hue, notify, home)
+	automation.RegisterAutomations(automationClient, cfg.Zigbee.MQTTPrefix, hue, notify, home, p)
 
 	addr := ":8090"
 	srv := http.Server{

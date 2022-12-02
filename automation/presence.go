@@ -6,7 +6,6 @@ import (
 	"automation/integration/hue"
 	"automation/integration/ntfy"
 	"automation/presence"
-	"fmt"
 	"log"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
@@ -14,7 +13,7 @@ import (
 
 func presenceAutomation(client paho.Client, hue *hue.Hue, notify *ntfy.Notify, home *home.Home) {
 	on(client, "automation/presence", func(message presence.Message) {
-		fmt.Printf("Presence: %t\n", message.State)
+		log.Printf("Presence changed: %t\n", message.State)
 
 		// Set presence on the hue bridge
 		hue.SetFlag(41, message.State)

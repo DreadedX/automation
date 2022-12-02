@@ -16,6 +16,7 @@ func kettleAutomation(client paho.Client, prefix string, home *home.Home) {
 	const length = 5 * time.Minute
 
 	timer := time.NewTimer(length)
+	timer.Stop()
 
 	on(client, fmt.Sprintf("%s/%s", prefix, name), func(message zigbee.OnOffState) {
 		if message.State {
