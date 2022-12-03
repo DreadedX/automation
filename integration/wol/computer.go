@@ -20,8 +20,17 @@ func NewComputer(macAddress string, name device.InternalName, url string) *compu
 	return c
 }
 
+// device.Basic
+var _ device.Basic = (*computer)(nil)
+func (c *computer) GetID() device.InternalName {
+	return device.InternalName(c.name)
+}
+
+// device.Activate
+var _ device.Activate = (*computer)(nil)
 func (c *computer) Activate(state bool) {
 	if state {
+		log.Printf("Starting %s\n", c.name)
 		_, err := http.Get(c.url)
 		if err != nil {
 			log.Println(err)
@@ -29,12 +38,6 @@ func (c *computer) Activate(state bool) {
 	} else {
 		// This is not implemented
 	}
-}
-
-// device.Basic
-var _ device.Basic = (*computer)(nil)
-func (c *computer) GetID() device.InternalName {
-	return device.InternalName(c.name)
 }
 
 // google.DeviceInterface

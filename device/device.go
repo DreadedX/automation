@@ -13,6 +13,10 @@ type OnOff interface {
 	GetOnOff() bool
 }
 
+type Activate interface {
+	Activate(state bool)
+}
+
 func GetDevices[K any](devices *map[InternalName]Basic) map[InternalName]K {
 	devs := make(map[InternalName]K)
 

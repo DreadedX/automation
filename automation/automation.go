@@ -42,4 +42,5 @@ func RegisterAutomations(client paho.Client, prefix string, hue *hue.Hue, notify
 	kettleAutomation(client, prefix, home)
 	darknessAutomation(client, hue)
 	frontdoorAutomation(client, prefix, presence)
+	zeusAutomation(client, home)
 }
