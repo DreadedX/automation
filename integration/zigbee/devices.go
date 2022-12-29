@@ -39,6 +39,11 @@ func DevicesHandler(client paho.Client, prefix string, home *home.Home) {
 		// @TODO Instead of sending a sync request we should do something like home.sync <- interface{}
 		// This will then restart a timer, that way the sync will only trigger once everything has settled from multiple locations
 		home.Service.RequestSync(context.Background(), home.Username)
+
+		// Unsubscribe again, otherwise updates here will re-add all the devices which causes issues with the light sensor
+		if token := client.Unsubscribe(fmt.Sprintf("%s/bridge/devices", prefix)); token.Wait() && token.Error() != nil {
+			log.Println(token.Error())
+		}
 	}
 
 	if token := client.Subscribe(fmt.Sprintf("%s/bridge/devices", prefix), 1, handler); token.Wait() && token.Error() != nil {
